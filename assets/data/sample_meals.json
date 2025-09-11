@@ -1,0 +1,47 @@
+[
+  {
+    "id": "1",
+    "name": "Oats with Milk and Honey",
+    "category": "breakfast", 
+    "calories": 320,
+    "protein": 12.0,
+    "carbs": 45.0,
+    "fat": 8.0,
+    "ingredients": ["oats", "milk", "honey", "banana"],
+    "instructions": [
+      "Boil 200ml milk in a pan",
+      "Add 50g oats and cook for 5 minutes", 
+      "Stir occasionally to prevent sticking",
+      "Add honey and sliced banana",
+      "Serve hot"
+    ],
+    "cookTime": "10 minutes",
+    "difficulty": "Easy",
+    "cuisine": "Continental",
+    "isVegetarian": true,
+    "isVegan": false,
+    "createdAt": 1699200000000
+  },
+  {
+    "id": "2",
+    "name": "Dal Rice with Vegetables",
+    "category": "lunch",
+    "calories": 450,
+    "protein": 15.0,
+    "carbs": 70.0,
+    "fat": 10.0,
+    "ingredients": ["toor dal", "basmati rice", "turmeric", "vegetables"],
+    "instructions": [
+      "Cook rice separately",
+      "Boil dal with turmeric", 
+      "Add vegetables to dal",
+      "Serve with rice"
+    ],
+    "cookTime": "30 minutes",
+    "difficulty": "Medium",
+    "cuisine": "Indian",
+    "isVegetarian": true,
+    "isVegan": true,
+    "createdAt": 1699200000000
+  }
+]

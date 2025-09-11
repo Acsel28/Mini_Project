@@ -1,0 +1,52 @@
+name: ai_diet_app
+description: AI-Powered Diet Recommendation Mobile Application
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  provider: ^6.1.1
+  flutter_riverpod: ^2.4.9
+
+  # UI & Design
+  cupertino_icons: ^1.0.6
+  google_fonts: ^6.1.0  # Keep Google Fonts but we'll handle offline in code
+
+  # Storage & Data
+  shared_preferences: ^2.2.2
+
+  # Charts & Analytics  
+  fl_chart: ^0.65.0
+
+  # Accessibility & Voice
+  flutter_tts: ^3.8.5
+  speech_to_text: ^7.3.0
+
+  # Utilities
+  intl: ^0.18.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  # Commenting out assets and fonts since we won't use local files
+  # assets:
+  #   - assets/images/
+  #   - assets/data/
+
+  # fonts:
+  #   - family: Poppins
+  #     fonts:
+  #       - asset: assets/fonts/Poppins-Regular.ttf
+  #       - asset: assets/fonts/Poppins-Bold.ttf
+  #         weight: 700
