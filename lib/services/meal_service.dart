@@ -99,25 +99,25 @@ class MealService {
   // Get daily meal plan
   // Allow user to be nullable
 static Future<MealPlan> getDailyMealPlan(User? user) async {
-  await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 500));
 
-  // If user is null, just use 'none' diet (show all meals)
-  final dietPref = user?.dietPreference ?? 'none';
+    // If user is null, just use 'none' as default diet
+    final dietPref = user?.dietPreference ?? 'none';
 
-  final filteredMeals = _filterMealsByDiet(_sampleMeals, dietPref);
+    final filteredMeals = _filterMealsByDiet(_sampleMeals, dietPref);
 
-  final breakfast = _selectMealByCategory(filteredMeals, 'breakfast');
-  final lunch = _selectMealByCategory(filteredMeals, 'lunch');
-  final dinner = _selectMealByCategory(filteredMeals, 'dinner');
+    final breakfast = _selectMealByCategory(filteredMeals, 'breakfast');
+    final lunch = _selectMealByCategory(filteredMeals, 'lunch');
+    final dinner = _selectMealByCategory(filteredMeals, 'dinner');
 
-  return MealPlan.fromMeals(
-    id: DateTime.now().millisecondsSinceEpoch.toString(),
-    date: DateTime.now(),
-    breakfast: breakfast,
-    lunch: lunch,
-    dinner: dinner,
-  );
-}
+    return MealPlan.fromMeals(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      date: DateTime.now(),
+      breakfast: breakfast,
+      lunch: lunch,
+      dinner: dinner,
+    );
+  }
 
 
   // Get recipes by ingredients

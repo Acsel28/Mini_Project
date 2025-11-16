@@ -19,7 +19,7 @@ try {
   console.log('Loading auth route...');
   const authRoute = require('./routes/auth');
   console.log('Auth route loaded:', typeof authRoute);
-  app.use('/api/auth', authRoute);
+  app.use('/api/auth', authRoute);  
 } catch (e) {
   console.error('Error loading auth route:', e.message);
   throw e;

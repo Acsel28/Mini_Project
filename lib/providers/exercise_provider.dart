@@ -1,35 +1,88 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/exercise_model.dart';
 import '../services/exercise_service.dart';
 
-class ExerciseNotifier extends StateNotifier<AsyncValue<List<Exercise>>> {
-  ExerciseNotifier() : super(const AsyncValue.loading()) {
-    loadGeneralExercises();
-  }
+class ExercisePlanState {
+  final bool isLoading;
+  final String? error;
+  final List<Map<String, dynamic>> exercises;
+  final String? mode;      // 'llm' or 'fallback_static'
+  final String? condition; // diabetes / knee_pain / general
 
-  Future<void> loadGeneralExercises() async {
-    state = const AsyncValue.loading();
-    try {
-      final exercises = await ExerciseService.getExercises();
-      state = AsyncValue.data(exercises);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
+  ExercisePlanState({
+    required this.isLoading,
+    required this.exercises,
+    this.error,
+    this.mode,
+    this.condition,
+  });
 
-  Future<void> loadForCondition(String condition) async {
-    state = const AsyncValue.loading();
-    try {
-      final exercises =
-          await ExerciseService.getExercises(condition: condition);
-      state = AsyncValue.data(exercises);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
+  factory ExercisePlanState.initial() => ExercisePlanState(
+        isLoading: false,
+        exercises: const [],
+        error: null,
+        mode: null,
+        condition: null,
+      );
+
+  ExercisePlanState copyWith({
+    bool? isLoading,
+    String? error,
+    List<Map<String, dynamic>>? exercises,
+    String? mode,
+    String? condition,
+  }) {
+    return ExercisePlanState(
+      isLoading: isLoading ?? this.isLoading,
+      error: error,
+      exercises: exercises ?? this.exercises,
+      mode: mode ?? this.mode,
+      condition: condition ?? this.condition,
+    );
   }
 }
 
-final exerciseProvider =
-    StateNotifierProvider<ExerciseNotifier, AsyncValue<List<Exercise>>>(
-  (ref) => ExerciseNotifier(),
-);
+class ExercisePlanNotifier extends StateNotifier<ExercisePlanState> {
+  ExercisePlanNotifier() : super(ExercisePlanState.initial());
+
+  Future<void> loadPlan({
+    String? condition,
+    String? customCondition,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      final res = await ExerciseService.getExercisePlan(
+        condition: condition,
+        customCondition: customCondition,
+      );
+
+      final exercises =
+          (res['exercises'] as List?)?.map<Map<String, dynamic>>(
+                (e) => Map<String, dynamic>.from(e as Map),
+              ).toList() ??
+              <Map<String, dynamic>>[];
+
+      state = state.copyWith(
+        isLoading: false,
+        exercises: exercises,
+        mode: res['mode']?.toString(),
+        condition: res['condition']?.toString(),
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  void clear() {
+    state = ExercisePlanState.initial();
+  }
+}
+
+// Riverpod provider
+final exercisePlanProvider =
+    StateNotifierProvider<ExercisePlanNotifier, ExercisePlanState>((ref) {
+  return ExercisePlanNotifier();
+});

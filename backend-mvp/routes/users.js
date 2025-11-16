@@ -17,6 +17,7 @@ router.put('/profile', requireAuth, (req, res) => {
     height_cm,
     weight_kg,
     language,
+    diet_type,
     disease_profile_id,
     target_calories,
     accessibility_flags,
@@ -27,31 +28,58 @@ router.put('/profile', requireAuth, (req, res) => {
       .prepare('SELECT user_id FROM user_profiles WHERE user_id = ?')
       .get(userId);
 
+    const now = Date.now(); // store as INTEGER (ms since epoch)
+
     if (existing) {
+      // UPDATE existing profile
       db.prepare(
-        'UPDATE user_profiles ' +
-          'SET age = ?, gender = ?, height_cm = ?, weight_kg = ?, ' +
-          'language = ?, disease_profile_id = ?, ' +
-          'target_calories = ?, accessibility_flags = ? ' +
-          'WHERE user_id = ?'
+        `
+        UPDATE user_profiles
+        SET
+          age = ?,
+          gender = ?,
+          height_cm = ?,
+          weight_kg = ?,
+          language = ?,
+          diet_type = ?,
+          disease_profile_id = ?,
+          target_calories = ?,
+          accessibility_flags = ?,
+          updated_at = ?
+        WHERE user_id = ?
+        `
       ).run(
         age ?? null,
         gender ?? null,
         height_cm ?? null,
         weight_kg ?? null,
         language ?? 'en',
+        diet_type ?? null,
         disease_profile_id ?? null,
         target_calories ?? null,
-        accessibility_flags ? JSON.stringify(accessibility_flags) : null,
+        accessibility_flags ?? null,
+        now,
         userId
       );
     } else {
+      // INSERT new profile – include created_at & updated_at
       db.prepare(
-        'INSERT INTO user_profiles ' +
-          '(user_id, age, gender, height_cm, weight_kg, ' +
-          ' language, disease_profile_id, ' +
-          ' target_calories, accessibility_flags) ' +
-          'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        `
+        INSERT INTO user_profiles (
+          user_id,
+          age,
+          gender,
+          height_cm,
+          weight_kg,
+          language,
+          diet_type,
+          disease_profile_id,
+          target_calories,
+          accessibility_flags,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `
       ).run(
         userId,
         age ?? null,
@@ -59,18 +87,28 @@ router.put('/profile', requireAuth, (req, res) => {
         height_cm ?? null,
         weight_kg ?? null,
         language ?? 'en',
+        diet_type ?? null,
         disease_profile_id ?? null,
         target_calories ?? null,
-        accessibility_flags ? JSON.stringify(accessibility_flags) : null
+        accessibility_flags ?? null,
+        now,
+        now
       );
     }
 
-    return res.json({ ok: true });
+    // Return the fresh profile
+    const profile = db
+      .prepare('SELECT * FROM user_profiles WHERE user_id = ?')
+      .get(userId);
+
+    return res.json({ ok: true, profile });
   } catch (err) {
     console.error('PUT /api/users/profile error:', err);
-    return res.status(500).json({ error: 'db error' });
+    return res.status(500).json({ error: 'server error' });
   }
 });
+
+module.exports = router;
 
 /**
  * GET /api/users/me

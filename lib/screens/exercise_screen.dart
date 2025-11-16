@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../core/theme.dart';
-import '../core/constants.dart';
-import '../models/exercise_model.dart';
-import '../providers/exercise_provider.dart';
+import '../../core/theme.dart';
+import '../../core/constants.dart';
+import '../services/exercise_service.dart';
 
 class ExerciseScreen extends ConsumerStatefulWidget {
   const ExerciseScreen({super.key});
@@ -13,130 +12,128 @@ class ExerciseScreen extends ConsumerStatefulWidget {
 }
 
 class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
-  String _mode = 'general'; // 'general' or 'disease'
-  String _selectedCondition = 'diabetes';
+  bool _loading = false;
+  String? _error;
+  List<dynamic> _exercises = [];
+  String? _mode;
+  String? _condition;
+  final TextEditingController _conditionCtrl = TextEditingController();
+  final TextEditingController _customCtrl = TextEditingController();
 
-  final List<Map<String, String>> _conditions = const [
-    {'key': 'diabetes', 'label': 'Diabetes'},
-    {'key': 'hypertension', 'label': 'Hypertension'},
-    {'key': 'obesity', 'label': 'Obesity / Weight'},
-    {'key': 'pcos', 'label': 'PCOS'},
-    {'key': 'heart', 'label': 'Heart'},
-  ];
+  Future<void> _loadPlan() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final res = await ExerciseService.getExercisePlan(
+        condition: _conditionCtrl.text.trim().isEmpty
+            ? null
+            : _conditionCtrl.text.trim(),
+        customCondition: _customCtrl.text.trim().isEmpty
+            ? null
+            : _customCtrl.text.trim(),
+      );
+
+      setState(() {
+        _mode = res['mode']?.toString();
+        _condition = res['condition']?.toString();
+        _exercises = (res['exercises'] as List?) ?? [];
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
 
   @override
-  void initState() {
-    super.initState();
-    // General plan is loaded by default in provider constructor
-  }
-
-  void _onModeChanged(String mode) {
-    setState(() => _mode = mode);
-    if (mode == 'general') {
-      ref.read(exerciseProvider.notifier).loadGeneralExercises();
-    } else {
-      ref
-          .read(exerciseProvider.notifier)
-          .loadForCondition(_selectedCondition);
-    }
-  }
-
-  void _onConditionChanged(String conditionKey) {
-    setState(() => _selectedCondition = conditionKey);
-    if (_mode == 'disease') {
-      ref.read(exerciseProvider.notifier).loadForCondition(conditionKey);
-    }
+  void dispose() {
+    _conditionCtrl.dispose();
+    _customCtrl.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final exercisesAsync = ref.watch(exerciseProvider);
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Exercise Plans'),
-      ),
+      appBar: AppBar(title: const Text('Exercise Plan')),
       body: Padding(
         padding: const EdgeInsets.all(AppConstants.defaultPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Mode toggle
-            Row(
-              children: [
-                ChoiceChip(
-                  label: const Text('General'),
-                  selected: _mode == 'general',
-                  onSelected: (_) => _onModeChanged('general'),
-                ),
-                const SizedBox(width: 12),
-                ChoiceChip(
-                  label: const Text('Disease-Specific'),
-                  selected: _mode == 'disease',
-                  onSelected: (_) => _onModeChanged('disease'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Condition selector (only when disease mode)
-            if (_mode == 'disease') ...[
-              const Text(
-                'Select condition',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: _conditions
-                    .map(
-                      (c) => ChoiceChip(
-                        label: Text(c['label']!),
-                        selected: _selectedCondition == c['key'],
-                        onSelected: (_) => _onConditionChanged(c['key']!),
-                      ),
-                    )
-                    .toList(),
-              ),
-              const SizedBox(height: 16),
-            ],
-
             const Text(
-              'Recommended Exercises',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              'Disease / Condition (optional)',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            TextField(
+              controller: _conditionCtrl,
+              decoration: const InputDecoration(
+                hintText: 'e.g. knee_pain, diabetes, pcos',
+              ),
             ),
             const SizedBox(height: 12),
-
-            Expanded(
-              child: exercisesAsync.when(
-                data: (list) {
-                  if (list.isEmpty) {
-                    return const Center(
-                      child: Text('No exercises found.'),
-                    );
-                  }
-                  return ListView.separated(
-                    itemCount: list.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final ex = list[index];
-                      return _buildExerciseCard(ex);
-                    },
-                  );
-                },
-                loading: () => const Center(
-                  child: CircularProgressIndicator(),
-                ),
-                error: (e, _) => Center(
-                  child: Text(
-                    'Failed to load exercises:\n$e',
-                    textAlign: TextAlign.center,
-                  ),
-                ),
+            const Text(
+              'Custom description (optional)',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            TextField(
+              controller: _customCtrl,
+              decoration: const InputDecoration(
+                hintText: 'e.g. pain when climbing stairs',
               ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _loading ? null : _loadPlan,
+                child: _loading
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Generate Exercise Plan'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (_mode != null)
+              Text(
+                'Source: ${_mode == 'llm' ? 'AI-generated' : 'Static fallback'} (${_condition ?? 'general'})',
+                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Expanded(
+              child: _exercises.isEmpty
+                  ? const Center(
+                      child: Text('No exercises loaded yet'),
+                    )
+                  : ListView.separated(
+                      itemCount: _exercises.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final ex = _exercises[index] as Map<String, dynamic>;
+                        return _buildExerciseCard(ex);
+                      },
+                    ),
             ),
           ],
         ),
@@ -144,7 +141,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
     );
   }
 
-  Widget _buildExerciseCard(Exercise ex) {
+  Widget _buildExerciseCard(Map<String, dynamic> ex) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: AppStyles.cardDecoration,
@@ -152,43 +149,52 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            ex.name,
+            ex['name']?.toString() ?? 'Exercise',
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            '${ex.duration} • ${ex.intensity} • ${ex.frequency}',
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
+          if (ex['target_area'] != null || ex['intensity'] != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              [
+                if (ex['target_area'] != null) ex['target_area'].toString(),
+                if (ex['intensity'] != null) 'Intensity: ${ex['intensity']}',
+              ].where((e) => e.isNotEmpty).join(' • '),
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            ex.description,
-            style: const TextStyle(fontSize: 13),
-          ),
-          if (ex.caution != null && ex.caution!.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.warning_amber_rounded,
-                    size: 16, color: AppColors.error),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    ex.caution!,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.error,
-                    ),
-                  ),
-                ),
-              ],
+          ],
+          const SizedBox(height: 6),
+          if (ex['duration'] != null || ex['sets'] != null || ex['reps_or_duration'] != null)
+            Text(
+              [
+                if (ex['duration'] != null) 'Duration: ${ex['duration']}',
+                if (ex['sets'] != null) 'Sets: ${ex['sets']}',
+                if (ex['reps_or_duration'] != null)
+                  ex['reps_or_duration'].toString(),
+              ].where((e) => e.isNotEmpty).join(' • '),
+              style: const TextStyle(fontSize: 12),
+            ),
+          if (ex['frequency'] != null || ex['frequency_per_week'] != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Frequency: ${(ex['frequency'] ?? ex['frequency_per_week']).toString()}',
+              style: const TextStyle(fontSize: 12),
+            ),
+          ],
+          if (ex['description'] != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              ex['description'].toString(),
+              style: const TextStyle(fontSize: 12),
+            ),
+          ],
+          if (ex['caution'] != null || ex['cautions'] != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Caution: ${(ex['caution'] ?? ex['cautions']).toString()}',
+              style: const TextStyle(fontSize: 12, color: Colors.redAccent),
             ),
           ],
         ],

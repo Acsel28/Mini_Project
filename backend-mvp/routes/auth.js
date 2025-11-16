@@ -1,7 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const db = require('../db/database');
-
+const { randomUUID } = require('crypto');  
 const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
@@ -35,18 +35,16 @@ router.post('/register', (req, res) => {
       return res.status(400).json({ error: 'email exists' });
     }
 
-    // 2) insert user (ONLY email + password_hash)
-    // For this mini project we just store plain password in password_hash.
+    // 2) generate id + timestamp
+    const userId = randomUUID();
+    const createdAt = Date.now(); // store as milliseconds since epoch
+
+    // 3) insert user with ALL required columns
     db.prepare(
-      'INSERT INTO users (email, password_hash) VALUES (?, ?)'
-    ).run(email, password);
+      'INSERT INTO users (id, email, password_hash, created_at) VALUES (?, ?, ?, ?)'
+    ).run(userId, email, password, createdAt);
 
-    // 3) fetch inserted user
-    const user = db
-      .prepare('SELECT id, email FROM users WHERE email = ?')
-      .get(email);
-
-    const userId = user.id;
+    // 4) build user object + token
     const accessToken = signAccess(userId);
 
     return res.json({
