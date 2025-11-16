@@ -7,6 +7,7 @@ import 'screens/auth/register_screen.dart';
 import 'core/theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
+import 'screens/exercise_screen.dart'; // add this import
 import 'screens/home/main_navigation_screen.dart';
 import 'services/storage_service.dart';
 import 'services/tts_service.dart';
@@ -55,6 +56,7 @@ class MyApp extends ConsumerWidget {
         //'/register': (context) => const RegisterScreen(),
         '/onboarding': (context) => const OnboardingScreen(),
         '/home': (context) => const MainNavigationScreen(),
+        '/exercises': (context) => const ExerciseScreen(),
       },
     );
   }

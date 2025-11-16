@@ -1,19 +1,35 @@
+// backend-mvp/routes/images.js
 const express = require('express');
-const router = express.Router();
-const multer = require('multer');
-const upload = multer({ dest: 'uploads/' });
-const { authMiddleware } = require('../middleware/auth_mw');
-const { v4: uuidv4 } = require('uuid');
-const db = require('../db/database');
+const { requireAuth } = require('../middleware/auth');
 
-router.post('/upload', authMiddleware, upload.single('file'), (req, res) => {
-  const uid = req.user.sub;
-  const file = req.file;
-  const id = uuidv4();
-  db.prepare('INSERT INTO uploads (id, user_id, path, type, created_at) VALUES (?,?,?,?,?)')
-    .run(id, uid, file.path, file.mimetype, Math.floor(Date.now()/1000));
-  // For MVP we return the file path which frontend can fetch from server (expose static route)
-  res.json({ id, path: `/static/${file.filename}`, originalname: file.originalname });
+const router = express.Router();
+
+/**
+ * POST /api/images/scan
+ * Accepts base64 image and returns placeholder nutrition/ingredient detection
+ */
+router.post('/scan', requireAuth, (req, res) => {
+  const userId = req.user.id;
+  const { base64Image } = req.body || {};
+
+  if (!base64Image) {
+    return res.status(400).json({ error: 'base64Image is required' });
+  }
+
+  console.log('Image scan request by:', userId);
+
+  // Stub response — replace with ML model later
+  return res.json({
+    detected_items: ['rice', 'dal', 'roti'], 
+    confidence: 0.92
+  });
+});
+
+/**
+ * (Optional) GET /api/images/test
+ */
+router.get('/test', requireAuth, (req, res) => {
+  res.json({ message: 'image route working' });
 });
 
 module.exports = router;

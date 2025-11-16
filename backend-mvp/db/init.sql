@@ -8,17 +8,18 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS user_profiles (
   user_id TEXT PRIMARY KEY,
-  name TEXT,
-  age INTEGER,
+  age INTEGER,  
   gender TEXT,
   height_cm REAL,
   weight_kg REAL,
-  language TEXT DEFAULT 'en',
-  target_calories INTEGER,
-  bmr REAL,
-  accessibility_flags TEXT,
+  language TEXT,
+  diet_type TEXT,
   disease_profile_id TEXT,
-  FOREIGN KEY(user_id) REFERENCES users(id)
+  target_calories INTEGER,
+  accessibility_flags TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- refresh tokens (store hashed token)

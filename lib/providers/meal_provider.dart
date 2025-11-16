@@ -11,24 +11,23 @@ class MealPlanNotifier extends StateNotifier<MealPlan?> {
   MealPlanNotifier(this.user) : super(null);
 
   Future<void> loadTodaysMealPlan() async {
-    if (user == null) return;
-
     try {
-      final mealPlan = await MealService.getDailyMealPlan(user!);
+      // user may be null; MealService now handles that
+      final mealPlan = await MealService.getDailyMealPlan(user);
       state = mealPlan;
     } catch (e) {
-      print('Error loading meal plan: \$e');
+      // note: remove the backslash before $e so it actually logs
+      print('Error loading meal plan: $e');
       state = null;
     }
   }
 
   Future<void> regenerateMealPlan() async {
-    if (user == null) return;
-
     state = null; // Show loading
     await loadTodaysMealPlan();
   }
 }
+
 
 // Recipe suggestions notifier
 class RecipeSuggestionsNotifier extends StateNotifier<AsyncValue<List<Meal>>> {

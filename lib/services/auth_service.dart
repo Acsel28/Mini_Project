@@ -2,8 +2,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/auth_service.dart';
+
 class AuthService {
   // For Flutter Web / Windows desktop use localhost:
   static const String baseUrl = 'http://localhost:4000';
@@ -41,14 +40,26 @@ class AuthService {
       throw Exception('Register failed: invalid response format');
     }
 
-    final access = decoded['accessToken'];
-    final refresh = decoded['refreshToken'];
+    // Be tolerant with keys
+    final access = decoded['accessToken'] ??
+        decoded['access_token'] ??
+        decoded['token'];
+    final refresh = decoded['refreshToken'] ?? decoded['refresh_token'];
 
-    if (access is String && refresh is String) {
-      await _storeTokens(access, refresh);
-    } else {
-      throw Exception('Register failed: missing tokens in response');
+    if (access is! String) {
+      throw Exception('Register failed: missing access token in response');
     }
+
+    // refresh can be null, that's fine
+    await _storeTokens(access, refresh is String ? refresh : null);
+
+    // Optional: store user if backend returns it
+    if (decoded['user'] is Map) {
+      final user = Map<String, dynamic>.from(decoded['user']);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user', jsonEncode(user));
+    }
+
   }
 
   /// Login → throws on error. Stores tokens on success.
@@ -85,14 +96,23 @@ class AuthService {
       throw Exception('Login failed: invalid response format');
     }
 
-    final access = decoded['accessToken'];
-    final refresh = decoded['refreshToken'];
+    final access = decoded['accessToken'] ??
+        decoded['access_token'] ??
+        decoded['token'];
+    final refresh = decoded['refreshToken'] ?? decoded['refresh_token'];
 
-    if (access is String && refresh is String) {
-      await _storeTokens(access, refresh);
-    } else {
-      throw Exception('Login failed: missing tokens in response');
+    if (access is! String) {
+      throw Exception('Login failed: missing access token in response');
     }
+
+    await _storeTokens(access, refresh is String ? refresh : null);
+
+    if (decoded['user'] is Map) {
+      final user = Map<String, dynamic>.from(decoded['user']);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user', jsonEncode(user));
+    }
+
   }
 
   /// Try to refresh access token using stored refresh token.
@@ -114,14 +134,16 @@ class AuthService {
     final decoded = jsonDecode(res.body);
     if (decoded is! Map) return false;
 
-    final access = decoded['accessToken'];
+    final access = decoded['accessToken'] ??
+        decoded['access_token'] ??
+        decoded['token'];
     if (access is! String) return false;
 
     await prefs.setString('accessToken', access);
     return true;
   }
 
-  /// Get current user from /api/users/me. (Optional; for future auto-login)
+  /// Get current user from /api/users/me.
   static Future<Map<String, dynamic>> getMe() async {
     final prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('accessToken');
@@ -155,7 +177,6 @@ class AuthService {
       throw Exception('getMe failed: invalid response format');
     }
 
-    // we return a non-null Map; any error throws above
     return Map<String, dynamic>.from(decoded);
   }
 
@@ -164,11 +185,15 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('accessToken');
     await prefs.remove('refreshToken');
+    await prefs.remove('user');
   }
 
-  static Future<void> _storeTokens(String access, String refresh) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('accessToken', access);
-    await prefs.setString('refreshToken', refresh);
+  static Future<void> _storeTokens(String access, String? refresh) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('accessToken', access);
+    if (refresh != null) {
+      await prefs.setString('refreshToken', refresh);
+    }
   }
+
 }

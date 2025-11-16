@@ -1,53 +1,99 @@
+// backend-mvp/routes/meals.js
 const express = require('express');
-const router = express.Router();
 const db = require('../db/database');
-const { authMiddleware } = require('../middleware/auth_mw');
-const llm = require('../services/llm_service');
-const { v4: uuidv4 } = require('uuid');
+const { requireAuth } = require('../middleware/auth');
+
+const router = express.Router();
 
 /**
- * GET /meals - list meals (filter via query)
+ * GET /api/meals/today
+ * Example protected route that fetches today's meals for the logged-in user
  */
-router.get('/', authMiddleware, (req, res) => {
-  const rows = db.prepare('SELECT id, title, calories, protein, carbs, fat, tags FROM meals LIMIT 100').all();
-  res.json(rows);
+router.get('/today', requireAuth, (req, res) => {
+  const userId = req.user.id;
+  try {
+    const meals = db
+      .prepare(
+        `SELECT id, user_id, date, meal_type, calories, protein, carbs, fats
+         FROM meals
+         WHERE user_id = ? AND date = date('now', 'localtime')`
+      )
+      .all(userId);
+
+    return res.json({ meals });
+  } catch (err) {
+    console.error('GET /meals/today error:', err);
+    return res.status(500).json({ error: 'internal server error' });
+  }
 });
 
 /**
- * POST /meal-plans/generate
- * body: { date, target_calories, dietaryFlags: [], disease_profile_id }
+ * (Optional) GET /api/meals
+ * List all meals for current user
  */
-router.post('/generate', authMiddleware, async (req, res) => {
-  const userId = req.user.sub;
-  const body = req.body;
-  // For MVP: call LLM service that returns structured JSON, but we provide a simple fallback plan
+router.get('/', requireAuth, (req, res) => {
+  const userId = req.user.id;
   try {
-    const plan = await llm.generateMealPlan({
-      userId,
-      target_calories: body.target_calories || 1800,
-      dietaryFlags: body.dietaryFlags || [],
-      diseaseProfileId: body.disease_profile_id || null
-    });
+    const meals = db
+      .prepare(
+        `SELECT id, user_id, date, meal_type, calories, protein, carbs, fats
+         FROM meals
+         WHERE user_id = ?
+         ORDER BY date DESC`
+      )
+      .all(userId);
 
-    // save plan in DB
-    const id = uuidv4();
-    db.prepare('INSERT INTO meal_plans (id, user_id, date, meals_json, total_calories, meta_json) VALUES (?,?,?,?,?,?)')
-      .run(id, userId, body.date || new Date().toISOString().slice(0,10), JSON.stringify(plan.meals), plan.total_calories, JSON.stringify(plan.meta || {}));
-
-    res.json({ id, plan });
+    return res.json({ meals });
   } catch (err) {
-    console.error(err);
-    // fallback simple static plan
-    const fallback = {
-      meals: [
-        { title: 'Oats with fruit', calories: 400 },
-        { title: 'Grilled chicken salad', calories: 600 },
-        { title: 'Stir fry veggies + tofu', calories: 600 }
-      ],
-      total_calories: 1600,
-      meta: { source: 'fallback' }
-    };
-    res.json({ id: uuidv4(), plan: fallback });
+    console.error('GET /meals error:', err);
+    return res.status(500).json({ error: 'internal server error' });
+  }
+});
+
+/**
+ * (Optional) POST /api/meals
+ * Create a new meal for current user
+ */
+router.post('/', requireAuth, (req, res) => {
+  const userId = req.user.id;
+  const {
+    date,
+    meal_type,
+    calories,
+    protein,
+    carbs,
+    fats,
+  } = req.body;
+
+  try {
+    const stmt = db.prepare(
+      `INSERT INTO meals (user_id, date, meal_type, calories, protein, carbs, fats)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    );
+
+    const result = stmt.run(
+      userId,
+      date || new Date().toISOString().slice(0, 10), // yyyy-mm-dd
+      meal_type || 'other',
+      calories ?? 0,
+      protein ?? 0,
+      carbs ?? 0,
+      fats ?? 0
+    );
+
+    return res.status(201).json({
+      id: result.lastInsertRowid,
+      user_id: userId,
+      date,
+      meal_type,
+      calories,
+      protein,
+      carbs,
+      fats,
+    });
+  } catch (err) {
+    console.error('POST /meals error:', err);
+    return res.status(500).json({ error: 'internal server error' });
   }
 });
 

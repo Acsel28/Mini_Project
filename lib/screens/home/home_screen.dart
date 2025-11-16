@@ -209,39 +209,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildQuickActions() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Quick Actions',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 16),
-
-        Row(
-          children: [
-            Expanded(
-              child: QuickActionButton(
-                icon: Icons.restaurant,
-                label: 'Plan Meals',
-                color: AppColors.accent1,
-                onPressed: () => _planMeals(),
-              ),
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        'Quick Actions',
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      ),
+      const SizedBox(height: 16),
+      Row(
+        children: [
+          Expanded(
+            child: QuickActionButton(
+              icon: Icons.restaurant,
+              label: 'Plan Meals',
+              color: AppColors.accent1,
+              onPressed: () => _planMeals(),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: QuickActionButton(
-                icon: Icons.kitchen,
-                label: 'Use Ingredients',
-                color: AppColors.accent2,
-                onPressed: () => _navigateToTab(1),
-              ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: QuickActionButton(
+              icon: Icons.kitchen,
+              label: 'Use Ingredients',
+              color: AppColors.accent2,
+              onPressed: () => _navigateToTab(1),
             ),
-          ],
-        ),
-      ],
-    );
-  }
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      Row(
+        children: [
+          Expanded(
+            child: QuickActionButton(
+              icon: Icons.fitness_center,
+              label: 'Exercises',
+              color: AppColors.accent3,
+              onPressed: () {
+                Navigator.of(context).pushNamed('/exercises');
+              },
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+}
 
   Widget _buildTodaysMealPlan(MealPlan? mealPlan) {
     return Column(
