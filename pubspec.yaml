@@ -13,7 +13,7 @@ dependencies:
   # State Management
   provider: ^6.1.1
   flutter_riverpod: ^2.4.9
-
+  http: 1.5.0
   # UI & Design
   cupertino_icons: ^1.0.6
   google_fonts: ^6.1.0  # Keep Google Fonts but we'll handle offline in code
@@ -27,7 +27,7 @@ dependencies:
   # Accessibility & Voice
   flutter_tts: ^3.8.5
   speech_to_text: ^7.3.0
-
+  flutter_secure_storage: ^8.0.0
   # Utilities
   intl: ^0.18.1
 

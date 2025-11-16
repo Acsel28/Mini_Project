@@ -1,8 +1,9 @@
+// lib/screens/splash_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
 import '../services/storage_service.dart';
-import '../providers/user_provider.dart';
+import '../providers/auth_provider.dart'; // <- changed to auth provider
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -18,17 +19,35 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     _checkAuthStatus();
   }
 
-  void _checkAuthStatus() async {
-    await Future.delayed(const Duration(seconds: 2));
+  Future<void> _checkAuthStatus() async {
+    try {
+      // small delay for splash UX
+      await Future.delayed(const Duration(seconds: 2));
 
-    final isFirstTime = await StorageService.isFirstTime();
-    final user = ref.read(userProvider);
+      final isFirstTime = await StorageService.isFirstTime();
 
-    if (mounted) {
-      if (isFirstTime || user == null) {
+      // Try to load current user (this will attempt refresh if needed)
+      await ref.read(authProvider.notifier).loadCurrentUser();
+
+      final authState = ref.read(authProvider);
+
+      if (!mounted) return;
+
+      if (isFirstTime) {
+        Navigator.of(context).pushReplacementNamed('/onboarding');
+      } else if (authState.isAuthenticated) {
+        Navigator.of(context).pushReplacementNamed('/home');
+      } else {
+        Navigator.of(context).pushReplacementNamed('/login');
+      }
+    } catch (e) {
+      // on any error, fallback to login (but still respect first-time)
+      final isFirstTime = await StorageService.isFirstTime();
+      if (!mounted) return;
+      if (isFirstTime) {
         Navigator.of(context).pushReplacementNamed('/onboarding');
       } else {
-        Navigator.of(context).pushReplacementNamed('/home');
+        Navigator.of(context).pushReplacementNamed('/login');
       }
     }
   }

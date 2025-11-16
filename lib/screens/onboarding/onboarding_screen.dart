@@ -1,14 +1,14 @@
+// lib/screens/onboarding/onboarding_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../services/auth_service.dart';
+import '../../services/profile_service.dart';
+import '../../services/storage_service.dart';
+import '../../providers/auth_provider.dart';
 import '../../core/theme.dart';
-import '../../core/constants.dart';
-import '../../models/user_model.dart';
-import '../../providers/user_provider.dart';
-import '../../services/tts_service.dart';
-import '../../widgets/custom_button.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
-  const OnboardingScreen({super.key});
+  const OnboardingScreen({Key? key}) : super(key: key);
 
   @override
   ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -16,522 +16,300 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final PageController _pageController = PageController();
-  int _currentPage = 0;
-  final int _totalPages = 4;
+  int _page = 0;
 
-  // Form controllers
-  final _nameController = TextEditingController();
-  final _ageController = TextEditingController();
-  final _weightController = TextEditingController();
-  final _heightController = TextEditingController();
+  // Account fields
+  final TextEditingController _emailCtrl = TextEditingController();
+  final TextEditingController _passwordCtrl = TextEditingController();
+  final TextEditingController _nameCtrl = TextEditingController();
 
-  // User data
-  String _selectedGender = 'female';
-  String _selectedGoal = 'weight_loss';
-  String _selectedDietType = 'vegetarian';
-  String _selectedLanguage = 'english';
-  bool _accessibilityMode = false;
+  // Profile fields
+  final TextEditingController _ageCtrl = TextEditingController();
+  final TextEditingController _heightCtrl = TextEditingController();
+  final TextEditingController _weightCtrl = TextEditingController();
+  String? _gender;
+
+  // Preferences
+  String _diet = 'none';
+  String? _diseaseProfileId;
+
+  bool _loading = false;
 
   @override
   void dispose() {
     _pageController.dispose();
-    _nameController.dispose();
-    _ageController.dispose();
-    _weightController.dispose();
-    _heightController.dispose();
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    _nameCtrl.dispose();
+    _ageCtrl.dispose();
+    _heightCtrl.dispose();
+    _weightCtrl.dispose();
     super.dispose();
+  }
+
+  void _nextPage() {
+    if (_page < 2) {
+      _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+    }
+  }
+
+  void _prevPage() {
+    if (_page > 0) {
+      _pageController.previousPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+    }
+  }
+
+  // FINISH: always register (auto-register), login option exposed separately below
+  Future<void> _finishOnboarding() async {
+    final email = _emailCtrl.text.trim();
+    final password = _passwordCtrl.text;
+    final name = _nameCtrl.text.trim();
+
+    if (email.isEmpty || password.length < 6 || name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Please fill email, name and a password (min 6 chars).')));
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+    });
+
+    try {
+      debugPrint('Onboarding: starting register for $email');
+
+      // 1) Register - AuthService registers and stores tokens locally
+      await AuthService.register(email, password, name: name);
+      debugPrint('Onboarding: register returned, tokens should be stored');
+
+      // 2) Let auth provider refresh current user state (optional)
+      await ref.read(authProvider.notifier).loadCurrentUser();
+      debugPrint('Onboarding: loadCurrentUser done, authState: ${ref.read(authProvider)}');
+
+      // 3) Build profile payload
+      final profilePayload = <String, dynamic>{
+        'name': name,
+        'age': _ageCtrl.text.isNotEmpty ? int.tryParse(_ageCtrl.text) : null,
+        'gender': _gender,
+        'height_cm': _heightCtrl.text.isNotEmpty ? double.tryParse(_heightCtrl.text) : null,
+        'weight_kg': _weightCtrl.text.isNotEmpty ? double.tryParse(_weightCtrl.text) : null,
+        'language': 'en',
+        'target_calories': null,
+        'disease_profile_id': _diseaseProfileId,
+        'accessibility_flags': null,
+      };
+
+      debugPrint('Onboarding: sending profile payload: $profilePayload');
+
+      // 4) Update profile on server (requires access token stored by AuthService)
+      final resp = await ProfileService.updateProfile(profilePayload);
+      debugPrint('Onboarding: profile update status ${resp.statusCode}, body: ${resp.body}');
+
+      // 5) Mark onboarding done
+      await StorageService.setFirstTime(false);
+      debugPrint('Onboarding: setFirstTime(false) done');
+
+      // 6) Navigate to home
+      if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed('/home');
+    } catch (e, st) {
+      debugPrint('Onboarding/register failed: $e\n$st');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Registration failed: ${e.toString()}')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Widget _pageIndicator() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(3, (i) => AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        width: _page == i ? 18 : 10,
+        height: 10,
+        decoration: BoxDecoration(
+          color: _page == i ? AppColors.accent1 : Colors.white.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(10),
+        ),
+      )),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          // Progress Indicator
-          SafeArea(child: _buildProgressIndicator()),
-
-          // Page Content
-          Expanded(
-            child: PageView(
-              controller: _pageController,
-              onPageChanged: (index) {
-                setState(() => _currentPage = index);
-              },
-              children: [
-                _buildWelcomePage(),
-                _buildBasicInfoPage(),
-                _buildGoalsPage(),
-                _buildPreferencesPage(),
-              ],
-            ),
-          ),
-
-          // Navigation Buttons
-          _buildNavigationButtons(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProgressIndicator() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      child: Row(
-        children: List.generate(_totalPages, (index) {
-          return Expanded(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 2),
-              height: 4,
-              decoration: BoxDecoration(
-                color: index <= _currentPage 
-                  ? AppColors.primary 
-                  : AppColors.background,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          );
-        }),
-      ),
-    );
-  }
-
-  Widget _buildWelcomePage() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.restaurant_menu,
-              size: 80,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(height: 32),
-
-          const Text(
-            'Welcome to AI Diet App',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-
-          Text(
-            'Your personalized AI nutrition companion for a healthier lifestyle. Let\'s get to know you better!',
-            style: TextStyle(
-              fontSize: 16,
-              color: AppColors.textSecondary,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 40),
-
-          // Accessibility toggle
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: AppStyles.cardDecoration,
-            child: Row(
-              children: [
-                const Icon(Icons.accessibility, color: AppColors.primary),
-                const SizedBox(width: 16),
-                const Expanded(
-                  child: Text('Voice-First Mode\nEnhanced accessibility features'),
-                ),
-                Switch(
-                  value: _accessibilityMode,
-                  onChanged: (value) {
-                    setState(() => _accessibilityMode = value);
-                  },
-                  activeColor: AppColors.primary,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBasicInfoPage() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Tell us about yourself',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'This helps us create personalized meal plans',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 32),
-
-          TextField(
-            controller: _nameController,
-            decoration: const InputDecoration(
-              labelText: 'Full Name',
-              hintText: 'Enter your name',
-              prefixIcon: Icon(Icons.person),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _ageController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Age',
-                    hintText: '25',
-                    prefixIcon: Icon(Icons.cake),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _selectedGender,
-                  decoration: const InputDecoration(
-                    labelText: 'Gender',
-                    prefixIcon: Icon(Icons.person),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'female', child: Text('Female')),
-                    DropdownMenuItem(value: 'male', child: Text('Male')),
-                    DropdownMenuItem(value: 'other', child: Text('Other')),
-                  ],
-                  onChanged: (value) {
-                    setState(() => _selectedGender = value!);
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _weightController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Weight (kg)',
-                    hintText: '65',
-                    prefixIcon: Icon(Icons.monitor_weight),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: TextField(
-                  controller: _heightController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Height (cm)',
-                    hintText: '170',
-                    prefixIcon: Icon(Icons.height),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGoalsPage() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'What\'s your goal?',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 32),
-
-          _buildGoalOption('weight_loss', 'Weight Loss', 
-            'Lose weight safely and sustainably', Icons.trending_down),
-          _buildGoalOption('weight_gain', 'Weight Gain', 
-            'Gain healthy weight', Icons.trending_up),
-          _buildGoalOption('muscle_gain', 'Muscle Gain', 
-            'Build lean muscle mass', Icons.fitness_center),
-          _buildGoalOption('maintenance', 'Maintenance', 
-            'Maintain current weight', Icons.balance),
-          _buildGoalOption('healthy_eating', 'Healthy Eating', 
-            'Focus on nutrition and wellness', Icons.favorite),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGoalOption(String value, String title, String subtitle, IconData icon) {
-    final isSelected = _selectedGoal == value;
-
-    return GestureDetector(
-      onTap: () => setState(() => _selectedGoal = value),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withOpacity(0.1) : AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : Colors.transparent,
-            width: 2,
+      backgroundColor: AppColors.primary,
+      appBar: AppBar(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      leading: _page > 0
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: _prevPage,
+            )
+          : null,
+      actions: [
+        TextButton(
+          onPressed: () {
+            final email = _emailCtrl.text.trim();
+            Navigator.of(context).pushReplacementNamed(
+              '/login',
+              arguments: {'email': email},
+            );
+          },
+          child: const Text(
+            'Login',
+            style: TextStyle(color: Colors.white),
           ),
         ),
-        child: Row(
+      ],
+    ),
+
+      body: SafeArea(
+        child: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary : AppColors.textTertiary,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: Colors.white, size: 20),
-            ),
-            const SizedBox(width: 16),
+            const SizedBox(height: 8),
+            _pageIndicator(),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (idx) => setState(() { _page = idx; }),
                 children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: isSelected ? AppColors.primary : null,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
+                  _accountStep(),
+                  _profileStep(),
+                  _preferencesStep(),
                 ],
               ),
             ),
-            if (isSelected)
-              const Icon(Icons.check_circle, color: AppColors.primary),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: _loading
+                  ? const SizedBox(height: 48, child: Center(child: CircularProgressIndicator()))
+                  : Column(
+                      children: [
+                        Row(
+                          children: [
+                            if (_page < 2)
+                              Expanded(child: ElevatedButton(onPressed: _nextPage, child: const Text('Next')))
+                            else
+                              Expanded(child: ElevatedButton(onPressed: _finishOnboarding, child: const Text('Finish & Register'))),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        if (_page == 2)
+                          TextButton(
+                            onPressed: () {
+                              final email = _emailCtrl.text.trim();
+                              Navigator.of(context).pushReplacementNamed('/login', arguments: {'email': email});
+                            },
+                            child: const Text('Already have an account? Login'),
+                          ),
+                      ],
+                    ),
+            )
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPreferencesPage() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+  Widget _accountStep() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Dietary Preferences',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 32),
-
-          _buildDietOption('vegetarian', 'Vegetarian', '🥬'),
-          _buildDietOption('vegan', 'Vegan', '🌱'),
-          _buildDietOption('non_vegetarian', 'Non-Vegetarian', '🍗'),
-          _buildDietOption('keto', 'Keto', '🥑'),
-
-          const SizedBox(height: 32),
-
-          const Text(
-            'Language',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          const SizedBox(height: 12),
+          const Text('Create your account', style: TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
-
-          _buildLanguageOption('english', 'English', '🇺🇸'),
-          _buildLanguageOption('hindi', 'हिन्दी (Hindi)', '🇮🇳'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDietOption(String value, String title, String emoji) {
-    final isSelected = _selectedDietType == value;
-
-    return ListTile(
-      leading: Text(emoji, style: const TextStyle(fontSize: 24)),
-      title: Text(title),
-      trailing: Radio<String>(
-        value: value,
-        groupValue: _selectedDietType,
-        onChanged: (val) => setState(() => _selectedDietType = val!),
-        activeColor: AppColors.primary,
-      ),
-      onTap: () => setState(() => _selectedDietType = value),
-    );
-  }
-
-  Widget _buildLanguageOption(String value, String title, String flag) {
-    final isSelected = _selectedLanguage == value;
-
-    return ListTile(
-      leading: Text(flag, style: const TextStyle(fontSize: 24)),
-      title: Text(title),
-      trailing: Radio<String>(
-        value: value,
-        groupValue: _selectedLanguage,
-        onChanged: (val) => setState(() => _selectedLanguage = val!),
-        activeColor: AppColors.primary,
-      ),
-      onTap: () => setState(() => _selectedLanguage = value),
-    );
-  }
-
-  Widget _buildNavigationButtons() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      child: Row(
-        children: [
-          if (_currentPage > 0)
-            Expanded(
-              child: CustomButton(
-                text: 'Back',
-                onPressed: () => _previousPage(),
-                isOutlined: true,
-              ),
-            ),
-          if (_currentPage > 0) const SizedBox(width: 16),
-
-          Expanded(
-            child: CustomButton(
-              text: _currentPage == _totalPages - 1 ? 'Complete' : 'Next',
-              onPressed: () => _nextPage(),
-            ),
+          TextField(
+            controller: _nameCtrl,
+            decoration: const InputDecoration(labelText: 'Full name', filled: true),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _emailCtrl,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(labelText: 'Email', filled: true),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _passwordCtrl,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'Password (min 6 chars)', filled: true),
           ),
         ],
       ),
     );
   }
 
-  void _nextPage() {
-    if (_currentPage == _totalPages - 1) {
-      _completeOnboarding();
-    } else {
-      if (_validateCurrentPage()) {
-        _pageController.nextPage(
-          duration: AppConstants.shortAnimation,
-          curve: Curves.easeInOut,
-        );
-      }
-    }
-  }
-
-  void _previousPage() {
-    _pageController.previousPage(
-      duration: AppConstants.shortAnimation,
-      curve: Curves.easeInOut,
+  Widget _profileStep() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8),
+      child: SingleChildScrollView(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const SizedBox(height: 12),
+          const Text('About you', style: TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          TextField(controller: _ageCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Age', filled: true)),
+          const SizedBox(height: 12),
+          TextField(controller: _heightCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Height (cm)', filled: true)),
+          const SizedBox(height: 12),
+          TextField(controller: _weightCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Weight (kg)', filled: true)),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: _gender,
+            decoration: const InputDecoration(labelText: 'Gender', filled: true),
+            items: const [
+              DropdownMenuItem(value: 'male', child: Text('Male')),
+              DropdownMenuItem(value: 'female', child: Text('Female')),
+              DropdownMenuItem(value: 'other', child: Text('Other')),
+            ],
+            onChanged: (v) => setState(() { _gender = v; }),
+          ),
+        ]),
+      ),
     );
   }
 
-  bool _validateCurrentPage() {
-    switch (_currentPage) {
-      case 1: // Basic Info
-        if (_nameController.text.isEmpty ||
-            _ageController.text.isEmpty ||
-            _weightController.text.isEmpty ||
-            _heightController.text.isEmpty) {
-          _showSnackBar('Please fill in all required fields');
-          return false;
-        }
-        break;
-      default:
-        return true;
-    }
-    return true;
-  }
-
-  void _completeOnboarding() {
-    final user = User(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: _nameController.text.trim(),
-      age: int.tryParse(_ageController.text) ?? 25,
-      weight: double.tryParse(_weightController.text) ?? 65.0,
-      height: double.tryParse(_heightController.text) ?? 170.0,
-      gender: _selectedGender,
-      goal: _selectedGoal,
-      targetCalories: _calculateTargetCalories(),
-      dietPreference: _selectedDietType,
-      language: _selectedLanguage,
-      accessibilityMode: _accessibilityMode,
-      healthConditions: [],
-      activityLevel: 'moderately_active',
-      createdAt: DateTime.now(),
-    );
-
-    ref.read(userProvider.notifier).setUser(user);
-    Navigator.of(context).pushReplacementNamed('/home');
-
-    if (_accessibilityMode) {
-      TTSService.speak('Setup complete! Welcome to your AI Diet App');
-    }
-  }
-
-  int _calculateTargetCalories() {
-    final age = int.tryParse(_ageController.text) ?? 25;
-    final weight = double.tryParse(_weightController.text) ?? 65.0;
-    final height = double.tryParse(_heightController.text) ?? 170.0;
-
-    // Simple BMR calculation
-    double bmr;
-    if (_selectedGender == 'male') {
-      bmr = 88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age);
-    } else {
-      bmr = 447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age);
-    }
-
-    final tdee = bmr * 1.55; // Moderate activity
-
-    switch (_selectedGoal) {
-      case 'weight_loss':
-        return (tdee - 500).round();
-      case 'weight_gain':
-        return (tdee + 500).round();
-      default:
-        return tdee.round();
-    }
-  }
-
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+  Widget _preferencesStep() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SizedBox(height: 12),
+        const Text('Preferences', style: TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 16),
+        const Text('Diet type', style: TextStyle(color: Colors.white70)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children: [
+            ChoiceChip(label: const Text('None'), selected: _diet == 'none', onSelected: (_) => setState(() { _diet = 'none'; })),
+            ChoiceChip(label: const Text('Vegetarian'), selected: _diet == 'vegetarian', onSelected: (_) => setState(() { _diet = 'vegetarian'; })),
+            ChoiceChip(label: const Text('Vegan'), selected: _diet == 'vegan', onSelected: (_) => setState(() { _diet = 'vegan'; })),
+            ChoiceChip(label: const Text('Keto'), selected: _diet == 'keto', onSelected: (_) => setState(() { _diet = 'keto'; })),
+          ],
+        ),
+        const SizedBox(height: 16),
+        const Text('Medical conditions (optional)', style: TextStyle(color: Colors.white70)),
+        const SizedBox(height: 8),
+        // For MVP we keep this free text; later replace with curated disease_profile selection
+        TextFormField(
+          initialValue: _diseaseProfileId,
+          onChanged: (v) => setState(() { _diseaseProfileId = v.isNotEmpty ? v : null; }),
+          decoration: const InputDecoration(hintText: 'e.g., diabetes_type2', filled: true),
+        ),
+        const SizedBox(height: 24),
+        const Text('When you tap Finish we will create your account and save this profile.', style: TextStyle(color: Colors.white70)),
+      ]),
     );
   }
 }
