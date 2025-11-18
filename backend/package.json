@@ -5,7 +5,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "seed": "node db/seed.js"
+    "seed": "node db/seed.js",
+    "seed:meals": "node db/seed_meals.js",
+    "test:data-driven": "node scripts/test_data_driven.js"
   },
   "keywords": [],
   "author": "",

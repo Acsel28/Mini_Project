@@ -112,10 +112,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // 4️⃣ NAVIGATE TO HOME
     setState(() => loading = false);
 
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
-      (_) => false,
-    );
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+        (_) => false,
+      );
+    }
   }
 }

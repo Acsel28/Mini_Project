@@ -44,6 +44,11 @@ class UserService {
     required double weightKg,
     required String language,
     required int targetCalories,
+    String? goal,
+    String? dietPreference,
+    bool? accessibilityMode,
+    List<String>? healthConditions,
+    String? activityLevel,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString("accessToken");
@@ -60,6 +65,15 @@ class UserService {
       "language": language,
       "target_calories": targetCalories
     });
+    // Add optional fields
+    final Map<String, dynamic> decoded = jsonDecode(body);
+    if (goal != null) decoded['goal'] = goal;
+    if (dietPreference != null) decoded['dietPreference'] = dietPreference;
+    if (accessibilityMode != null) decoded['accessibilityMode'] = accessibilityMode;
+    if (healthConditions != null) decoded['healthConditions'] = healthConditions;
+    if (activityLevel != null) decoded['activityLevel'] = activityLevel;
+
+    final finalBody = jsonEncode(decoded);
 
     final res = await http.put(
       url,
@@ -67,7 +81,7 @@ class UserService {
         "Authorization": "Bearer $token",
         "Content-Type": "application/json",
       },
-      body: body,
+      body: finalBody,
     );
 
     print("UPDATE /profile STATUS: ${res.statusCode} BODY: ${res.body}");

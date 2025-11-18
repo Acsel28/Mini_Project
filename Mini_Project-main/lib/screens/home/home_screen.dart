@@ -1,3 +1,5 @@
+import '../../widgets/health_checklist_widget.dart';
+import '../../widgets/hydration_sleep_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme.dart';
@@ -9,7 +11,11 @@ import '../../providers/meal_provider.dart';
 import '../../widgets/meal_card.dart';
 import '../../widgets/progress_circle.dart';
 import '../../widgets/quick_action_button.dart';
+import '../../widgets/reusable_components.dart';
+import 'disease_exercises_screen.dart';
+import 'disease_mealplan_screen.dart';
 import '../../services/tts_service.dart';
+import '../../services/voice_assistant_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -61,7 +67,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const SizedBox(height: 24),
 
               // Quick Actions
-              _buildQuickActions(),
+              _buildQuickActions(user),
+              const SizedBox(height: 24),
+
+              // Health Checklist
+              const HealthChecklistWidget(),
+              // Hydration & Sleep
+              const HydrationSleepWidget(),
+              // Featured Health Tips
+              _buildFeaturedSection(),
               const SizedBox(height: 24),
 
               // Today's Meal Plan
@@ -142,7 +156,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           const SizedBox(height: 16),
 
-          Row(
+            Row(
             children: [
               Expanded(
                 child: ProgressCircle(
@@ -208,7 +222,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildQuickActions() {
+  Widget _buildQuickActions(User? user) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -235,6 +249,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 label: 'Use Ingredients',
                 color: AppColors.accent2,
                 onPressed: () => _navigateToTab(1),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: QuickActionButton(
+                icon: Icons.sports_gymnastics,
+                label: user?.disease != null ? 'Exercises for ${user!.disease}' : 'Exercises',
+                color: AppColors.accent4,
+                onPressed: () {
+                  final diseaseKey = user?.disease_key ?? 'knee_pain';
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => DiseaseExercisesScreen(diseaseKey: diseaseKey)),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: QuickActionButton(
+                icon: Icons.local_dining,
+                label: 'Meal Plan',
+                color: AppColors.secondary,
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const DiseaseMealPlanScreen()),
+                ),
               ),
             ),
           ],
@@ -330,6 +375,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  Widget _buildFeaturedSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Health Tips',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: FeatureCard(
+                icon: Icons.local_hospital,
+                title: 'Check Health',
+                description: 'Manage your health conditions',
+                backgroundColor: AppColors.info,
+                onTap: () {},
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FeatureCard(
+                icon: Icons.fitness_center,
+                title: 'Track Fitness',
+                description: 'Log your daily exercises',
+                backgroundColor: AppColors.primary,
+                onTap: () {},
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        FeatureCard(
+          icon: Icons.apple,
+          title: 'Nutrition Tips',
+          description: 'Learn healthy eating habits and balanced diet recommendations',
+          backgroundColor: AppColors.success,
+          onTap: () {},
+        ),
+      ],
+    );
+  }
+
   // Helper methods
   String _getGreeting() {
     final hour = DateTime.now().hour;
@@ -354,7 +443,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // This would need to be implemented with navigation
   }
 
-  void _startVoiceInput() {
+  void _startVoiceInput() async {
+    await VoiceAssistantService.init();
     TTSService.speak('Voice input ready. What would you like to do?');
+    await VoiceAssistantService.startListening((transcript) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Heard: $transcript')));
+    });
   }
 }

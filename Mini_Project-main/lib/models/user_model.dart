@@ -12,12 +12,24 @@ class User {
   final String language;      
   final int targetCalories;
 
+  // Disease/Health info
+  final String? disease;       // disease name (e.g., "PCOS", "Diabetes Type 2")
+  final String? disease_key;   // disease keyname (e.g., "pcos", "diabetes_type2")
+  final String? disease_profile_id;
+
+  // Diet & Nutrition Preferences
+  final String? dietPreference;     // vegetarian, vegan, etc.
+  final String? mealType;           // balanced, high_protein, etc.
+  final String? allergies;          // user allergies/dietary restrictions
+
+  // Fitness & Activity
+  final String? fitnessGoal;        // weight_loss, muscle_gain, etc.
+  final String? activityLevel;      // sedentary, lightly_active, etc.
+
   // extra fields used ONLY by UI
   final String goal;
-  final String dietPreference;
   final bool accessibilityMode;
   final List<String> healthConditions;
-  final String activityLevel;
 
   User({
     required this.id,
@@ -29,12 +41,18 @@ class User {
     required this.weight,
     required this.language,
     required this.targetCalories,
+    this.disease,
+    this.disease_key,
+    this.disease_profile_id,
+    this.dietPreference,
+    this.mealType,
+    this.allergies,
+    this.fitnessGoal,
+    this.activityLevel,
 
     required this.goal,
-    required this.dietPreference,
     required this.accessibilityMode,
     required this.healthConditions,
-    required this.activityLevel,
   });
 
   // BMI
@@ -61,15 +79,24 @@ class User {
       language: map["language"] ?? "english",
       targetCalories:
           map["target_calories"] ?? map["targetCalories"] ?? 2000,
+      disease: map["disease"],
+      disease_key: map["disease_key"],
+      disease_profile_id: map["disease_profile_id"],
+
+      // Diet & Nutrition
+      dietPreference: map["diet_preference"] ?? map["dietPreference"],
+      mealType: map["meal_type"],
+      allergies: map["allergies"],
+
+      // Fitness & Activity
+      fitnessGoal: map["fitness_goal"],
+      activityLevel: map["activity_level"] ?? "moderately_active",
 
       // UI-only fallback values
       goal: map["goal"] ?? "healthy_eating",
-      dietPreference: map["dietPreference"] ?? "vegetarian",
       accessibilityMode: map["accessibilityMode"] ?? false,
       healthConditions:
           List<String>.from(map["healthConditions"] ?? []),
-      activityLevel:
-          map["activityLevel"] ?? "moderately_active",
     );
   }
 
@@ -87,12 +114,19 @@ class User {
       "weight_kg": weight,
       "language": language,
       "target_calories": targetCalories,
+      "disease": disease,
+      "disease_key": disease_key,
+      "disease_profile_id": disease_profile_id,
+
+      "diet_preference": dietPreference,
+      "meal_type": mealType,
+      "allergies": allergies,
+      "fitness_goal": fitnessGoal,
+      "activity_level": activityLevel,
 
       "goal": goal,
-      "dietPreference": dietPreference,
       "accessibilityMode": accessibilityMode,
       "healthConditions": healthConditions,
-      "activityLevel": activityLevel,
     };
   }
 

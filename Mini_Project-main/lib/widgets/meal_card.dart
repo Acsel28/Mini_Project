@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/theme.dart';
 import '../models/meal_model.dart';
 import '../services/tts_service.dart';
+import '../screens/home/recipe_detail_screen.dart';
 
 class MealCard extends StatelessWidget {
   final Meal meal;
@@ -20,7 +21,9 @@ class MealCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: onTap ?? () {
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => RecipeDetailScreen(meal: meal)));
+      },
       child: Container(
         decoration: AppStyles.cardDecoration,
         child: Column(

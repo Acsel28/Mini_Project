@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme.dart';
 import '../../core/constants.dart';
-import '../../models/user_model.dart';
 import '../../providers/user_provider.dart';
 import '../../services/tts_service.dart';
+import '../../services/disease_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../services/user_service.dart';
 import '../auth/signup_screen.dart';
@@ -38,6 +38,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   String _selectedDietType = 'vegetarian';
   String _selectedLanguage = 'english';
   bool _accessibilityMode = false;
+  List<dynamic> _availableDiseases = [];
+  final List<String> _selectedDiseaseIds = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDiseases();
+  }
+
+  Future<void> _loadDiseases() async {
+    final d = await DiseaseService.getAllDiseases();
+    if (d != null) {
+      setState(() => _availableDiseases = d);
+    }
+  }
 
   @override
   void dispose() {
@@ -387,6 +402,27 @@ GestureDetector(
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 32),
+          const Text('Health Conditions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          _availableDiseases.isEmpty
+              ? const Text('Loading conditions...')
+              : Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final d in _availableDiseases)
+                      FilterChip(
+                        label: Text(d['title'] ?? d['keyname']),
+                        selected: _selectedDiseaseIds.contains(d['id']),
+                        onSelected: (v) {
+                          setState(() {
+                            if (v) _selectedDiseaseIds.add(d['id']);
+                            else _selectedDiseaseIds.remove(d['id']);
+                          });
+                        },
+                      ),
+                  ],
+                ),
+          const SizedBox(height: 24),
 
           _buildDietOption('vegetarian', 'Vegetarian', '🥬'),
           _buildDietOption('vegan', 'Vegan', '🌱'),
@@ -508,6 +544,11 @@ void _completeOnboarding() async {
     weightKg: double.tryParse(_weightController.text) ?? 65.0,
     language: _selectedLanguage,
     targetCalories: targetCalories,
+    goal: _selectedGoal,
+    dietPreference: _selectedDietType,
+    accessibilityMode: _accessibilityMode,
+    healthConditions: _selectedDiseaseIds,
+    activityLevel: 'moderately_active',
   );
 
   if (!success) {
@@ -525,16 +566,16 @@ void _completeOnboarding() async {
   // 4️⃣ Save in provider
   await userNotifier.setUser(updatedUser);
 
-  // 5️⃣ Navigate to home
-  Navigator.of(context).pushReplacementNamed('/home');
+    // 5️⃣ Navigate to home
+    if (mounted) {
+      Navigator.of(context).pushReplacementNamed('/home');
+    }
 
-  // 6️⃣ Optional TTS
-  if (_accessibilityMode) {
-    TTSService.speak("Setup complete! Welcome to your AI Diet App");
-  }
-}
-
-  int _calculateTargetCalories() {
+    // 6️⃣ Optional TTS
+    if (_accessibilityMode) {
+      TTSService.speak("Setup complete! Welcome to your AI Diet App");
+    }
+  }  int _calculateTargetCalories() {
     final age = int.tryParse(_ageController.text) ?? 25;
     final weight = double.tryParse(_weightController.text) ?? 65.0;
     final height = double.tryParse(_heightController.text) ?? 170.0;

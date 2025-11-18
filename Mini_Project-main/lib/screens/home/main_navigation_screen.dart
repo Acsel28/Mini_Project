@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
+import 'dynamic_health_search_screen.dart';
+import 'nutrition_analytics_screen.dart';
 import 'ingredients_screen.dart';
 import 'progress_screen.dart';
 import 'profile_screen.dart';
+import 'coach_chat_screen.dart';
+import 'insights_screen.dart';
+import 'meal_selection_screen.dart';
 import '../../core/theme.dart';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -18,9 +23,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   final List<Widget> _screens = const [
     HomeScreen(),
+    DynamicHealthSearchScreen(),
+    NutritionAnalyticsScreen(),
     IngredientsScreen(),
     ProgressScreen(),
     ProfileScreen(),
+    CoachChatScreen(),
+    InsightsScreen(),
+    MealSelectionScreen(),
   ];
 
   @override
@@ -58,16 +68,36 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             label: 'Home',
           ),
           BottomNavigationBarItem(
+            icon: Icon(Icons.search),
+            label: 'Search',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.analytics),
+            label: 'Analytics',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.kitchen),
             label: 'Ingredients',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.analytics),
+            icon: Icon(Icons.trending_up),
             label: 'Progress',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: 'Profile',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat),
+            label: 'Coach',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.insights),
+            label: 'Insights',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.restaurant),
+            label: 'Meals',
           ),
         ],
       ),

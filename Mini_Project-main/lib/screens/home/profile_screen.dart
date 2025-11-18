@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme.dart';
 import '../../core/constants.dart';
 import '../../providers/user_provider.dart';
-import '../../services/tts_service.dart';
+import 'edit_profile_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -131,8 +131,6 @@ class ProfileScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
 
-          _buildHealthRow('Goal', _getGoalText(user.goal)),
-          _buildHealthRow('Diet Type', user.dietPreference),
           _buildHealthRow('Target Calories', '${user.targetCalories} cal/day'),
           _buildHealthRow('BMR', '${user.bmr.toInt()} cal/day'),
           _buildHealthRow('BMI Category', "${user.bmi.toStringAsFixed(1)}"),
@@ -220,29 +218,9 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  String _getGoalText(String goal) {
-    switch (goal) {
-      case 'weight_loss': return 'Weight Loss';
-      case 'weight_gain': return 'Weight Gain';
-      case 'muscle_gain': return 'Muscle Gain';
-      case 'maintenance': return 'Maintenance';
-      default: return 'Healthy Eating';
-    }
-  }
-
   void _showEditDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Profile'),
-        content: const Text('Profile editing will be implemented soon.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const EditProfileScreen()),
     );
   }
 

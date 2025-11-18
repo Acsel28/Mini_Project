@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'mealplan_service.dart';
 import '../models/meal_model.dart';
 import '../models/user_model.dart';
 
@@ -98,6 +99,50 @@ class MealService {
 
   // Get daily meal plan
   static Future<MealPlan> getDailyMealPlan(User user) async {
+    // Try backend-generated meal plan first
+    try {
+      final remote = await MealPlanService.generateForUser();
+      if (remote != null) {
+        // Convert to local Meal objects
+        Meal? toMeal(Map<String, dynamic>? m, String category) {
+          if (m == null) return null;
+          return Meal(
+            id: m['id'] ?? '',
+            name: m['title'] ?? '',
+            category: category,
+            calories: (m['calories'] ?? 0).toInt(),
+            protein: (m['protein'] ?? 0.0).toDouble(),
+            carbs: (m['carbs'] ?? 0.0).toDouble(),
+            fat: (m['fat'] ?? 0.0).toDouble(),
+            ingredients: List<String>.from(m['ingredients'] ?? []),
+            instructions: List<String>.from(m['recipe']['instructions'] ?? []),
+            cookTime: m['recipe'] != null ? (m['recipe']['cookTime'] ?? '') : '',
+            difficulty: (m['difficulty'] ?? 'Easy'),
+            cuisine: (m['cuisine'] ?? 'General'),
+            isVegetarian: (m['tags'] ?? []).contains('vegetarian'),
+            isVegan: (m['tags'] ?? []).contains('vegan'),
+            createdAt: DateTime.now(),
+          );
+        }
+
+        final breakfast = toMeal(remote['slots']['breakfast']?.isNotEmpty == true ? remote['slots']['breakfast'][0] : null, 'breakfast');
+        final lunch = toMeal(remote['slots']['lunch']?.isNotEmpty == true ? remote['slots']['lunch'][0] : null, 'lunch');
+        final dinner = toMeal(remote['slots']['dinner']?.isNotEmpty == true ? remote['slots']['dinner'][0] : null, 'dinner');
+
+        return MealPlan.fromMeals(
+          id: remote['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+          date: DateTime.now(),
+          breakfast: breakfast,
+          lunch: lunch,
+          dinner: dinner,
+          snacks: (remote['slots']['snacks'] ?? []).map<Meal>((m) => toMeal(m, 'snack')!).toList(),
+        );
+      }
+    } catch (e) {
+      print('Remote meal plan generation failed: $e');
+    }
+
+    // Fallback to local sample
     await Future.delayed(const Duration(milliseconds: 500));
 
     final filteredMeals = _filterMealsByDiet(_sampleMeals, "vegetarian");

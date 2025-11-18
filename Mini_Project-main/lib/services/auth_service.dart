@@ -48,18 +48,46 @@ class AuthService {
   // REGISTER
   // ----------------------------
   static Future<AuthResult> register(
-      String email, String password, String name) async {
+    String email,
+    String password,
+    String name, {
+    double? height,
+    double? weight,
+    int? age,
+    String? gender,
+    String? disease,
+    String? dietPreference,
+    String? fitnessGoal,
+    String? activityLevel,
+    String? allergies,
+    String? mealType,
+    int? targetCalories,
+  }) async {
     try {
       final url = Uri.parse("$baseUrl/api/auth/register");
+
+      final body = <String, dynamic>{
+        "email": email,
+        "password": password,
+        "name": name,
+      };
+
+      if (height != null) body["height_cm"] = height;
+      if (weight != null) body["weight_kg"] = weight;
+      if (age != null) body["age"] = age;
+      if (gender != null) body["gender"] = gender;
+      if (disease != null) body["disease"] = disease;
+      if (dietPreference != null) body["diet_preference"] = dietPreference;
+      if (fitnessGoal != null) body["fitness_goal"] = fitnessGoal;
+      if (activityLevel != null) body["activity_level"] = activityLevel;
+      if (allergies != null) body["allergies"] = allergies;
+      if (mealType != null) body["meal_type"] = mealType;
+      if (targetCalories != null) body["target_calories"] = targetCalories;
 
       final res = await http.post(
         url,
         headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "email": email,
-          "password": password,
-          "name": name,
-        }),
+        body: jsonEncode(body),
       );
 
       print("REGISTER status=${res.statusCode} body=${res.body}");
