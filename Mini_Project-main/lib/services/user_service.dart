@@ -1,0 +1,93 @@
+// lib/services/user_service.dart
+import 'dart:convert';
+import 'dart:developer' as developer;
+
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/user_model.dart';
+
+class UserService {
+  static const String baseUrl = "http://localhost:4000";
+
+  static Future<User?> fetchCurrentUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString("accessToken");
+
+    if (token == null) {
+      developer.log('❌ No access token stored.');
+      return null;
+    }
+
+    final url = Uri.parse('$baseUrl/api/users/me');
+
+    final response = await http.get(
+      url,
+      headers: {"Authorization": "Bearer $token"},
+    );
+
+    developer.log('FETCH /me STATUS: ${response.statusCode}');
+    developer.log('FETCH /me BODY:\n${response.body}');
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      final data = decoded is Map && decoded.containsKey('user') ? decoded['user'] : decoded;
+      return User.fromMap(data as Map<String, dynamic>);
+    }
+
+    developer.log('❌ Failed to load user: ${response.body}');
+    return null;
+  }
+
+  static Future<bool> updateProfile({
+    required String name,
+    required int age,
+    required String gender,
+    required double heightCm,
+    required double weightKg,
+    required String language,
+    required int targetCalories,
+    String? goal,
+    String? dietPreference,
+    bool? accessibilityMode,
+    List<String>? healthConditions,
+    String? activityLevel,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString("accessToken");
+    if (token == null) return false;
+
+    final url = Uri.parse('$baseUrl/api/users/profile');
+
+    final body = jsonEncode({
+      "name": name,
+      "age": age,
+      "gender": gender,
+      "height_cm": heightCm,
+      "weight_kg": weightKg,
+      "language": language,
+      "target_calories": targetCalories
+    });
+    // Add optional fields
+    final Map<String, dynamic> decoded = jsonDecode(body);
+    if (goal != null) decoded['goal'] = goal;
+    if (dietPreference != null) decoded['dietPreference'] = dietPreference;
+    if (accessibilityMode != null) decoded['accessibilityMode'] = accessibilityMode;
+    if (healthConditions != null) decoded['healthConditions'] = healthConditions;
+    if (activityLevel != null) decoded['activityLevel'] = activityLevel;
+
+    final finalBody = jsonEncode(decoded);
+
+    final res = await http.put(
+      url,
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: finalBody,
+    );
+
+    developer.log('UPDATE /profile STATUS: ${res.statusCode} BODY: ${res.body}');
+
+    return res.statusCode == 200;
+  }
+}
