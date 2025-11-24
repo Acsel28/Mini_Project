@@ -1253,10 +1253,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _startVoiceInput() async {
+    final granted = await VoiceAssistantService.ensureMicPermission();
+    if (!granted) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enable microphone access to use voice commands.')),
+      );
+      return;
+    }
+
     await VoiceAssistantService.promptAndListen(
       prompt: 'Voice input ready. What would you like to do?',
       onTranscript: (_) {},
       ref: ref,
+      listenFor: const Duration(seconds: 8),
     );
   }
 

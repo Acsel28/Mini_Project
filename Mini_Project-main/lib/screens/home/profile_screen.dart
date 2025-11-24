@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/design_system.dart';
 import '../../core/theme.dart';
 import '../../providers/user_provider.dart';
+import '../../services/user_service.dart';
+import '../../utils/language_utils.dart';
 import '../../widgets/reusable_components.dart';
 import '../../widgets/wellness_scaffold.dart';
 import 'edit_profile_screen.dart';
@@ -195,6 +197,7 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildSettings(BuildContext context, WidgetRef ref) {
+    final languageLabel = languageDisplayLabel(ref.watch(userProvider)?.language);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: AppStyles.cardDecoration,
@@ -210,7 +213,7 @@ class ProfileScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.language, color: AppColors.primary),
             title: const Text('Language'),
-            subtitle: const Text('English'),
+            subtitle: Text(languageLabel),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
             onTap: () => _showLanguageDialog(context, ref),
           ),
@@ -267,7 +270,7 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   void _showLanguageDialog(BuildContext context, WidgetRef ref) {
-    final currentLanguage = ref.read(userProvider)?.language ?? 'english';
+    final currentLanguage = normalizeLanguage(ref.read(userProvider)?.language);
     showDialog(
       context: context,
       builder: (dialogContext) {
@@ -275,6 +278,9 @@ class ProfileScreen extends ConsumerWidget {
         void closeWith(String value) {
           selectedLanguage = value;
           Navigator.of(dialogContext).pop();
+          if (value != currentLanguage) {
+            _applyLanguageChange(context, ref, value);
+          }
         }
 
         return StatefulBuilder(
@@ -309,6 +315,33 @@ class ProfileScreen extends ConsumerWidget {
         );
       },
     );
+  }
+
+  Future<void> _applyLanguageChange(BuildContext context, WidgetRef ref, String language) async {
+    final scaffold = ScaffoldMessenger.of(context);
+    try {
+      final updated = await UserService.updateLanguage(language);
+      if (updated) {
+        await ref.read(userProvider.notifier).updateLanguage(language);
+        scaffold.showSnackBar(
+          SnackBar(
+            content: Text(
+              isHindiLanguage(language)
+                  ? 'हिंदी मोड सक्रिय है'
+                  : 'Language switched to English',
+            ),
+          ),
+        );
+      } else {
+        scaffold.showSnackBar(
+          SnackBar(content: Text('Could not update language. Try again.')),
+        );
+      }
+    } catch (e) {
+      scaffold.showSnackBar(
+        SnackBar(content: Text('Language update failed: $e')),
+      );
+    }
   }
 
   void _showAccessibilityDialog(BuildContext context) {

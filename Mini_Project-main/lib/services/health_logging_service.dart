@@ -3,9 +3,10 @@ import 'dart:developer' as developer;
 
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
+import 'env_service.dart';
 
 class HealthLoggingService {
-  static const String baseUrl = "http://localhost:4000";
+  static String get _baseUrl => EnvService.apiBaseUrl;
 
   // Log water/hydration
   static Future<bool> logWater(int amountMl) async {
@@ -16,7 +17,7 @@ class HealthLoggingService {
         return false;
       }
 
-      final url = Uri.parse('$baseUrl/api/analytics/health/hydration');
+      final url = Uri.parse('$_baseUrl/api/analytics/health/hydration');
       developer.log('Attempting to log water: amount=$amountMl');
       
       final response = await http.post(
@@ -50,7 +51,7 @@ class HealthLoggingService {
         return false;
       }
 
-      final url = Uri.parse('$baseUrl/api/analytics/health/sleep');
+      final url = Uri.parse('$_baseUrl/api/analytics/health/sleep');
       developer.log('Attempting to log sleep: hours=$hours, quality=$quality');
       
       final response = await http.post(
@@ -81,7 +82,7 @@ class HealthLoggingService {
       final token = await AuthService.getAccessToken();
       if (token == null) return null;
 
-      final url = Uri.parse('$baseUrl/api/analytics/health/hydration-summary');
+      final url = Uri.parse('$_baseUrl/api/analytics/health/hydration-summary');
       final response = await http.get(
         url,
         headers: {
@@ -105,7 +106,7 @@ class HealthLoggingService {
       final token = await AuthService.getAccessToken();
       if (token == null) return null;
 
-      final url = Uri.parse('$baseUrl/api/analytics/health/sleep-summary');
+      final url = Uri.parse('$_baseUrl/api/analytics/health/sleep-summary');
       final response = await http.get(
         url,
         headers: {

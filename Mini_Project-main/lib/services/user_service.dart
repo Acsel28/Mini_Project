@@ -4,10 +4,12 @@ import 'dart:developer' as developer;
 
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../models/user_model.dart';
+import 'env_service.dart';
 
 class UserService {
-  static const String baseUrl = "http://localhost:4000";
+  static String get _baseUrl => EnvService.apiBaseUrl;
 
   static Future<User?> fetchCurrentUser() async {
     final prefs = await SharedPreferences.getInstance();
@@ -18,7 +20,7 @@ class UserService {
       return null;
     }
 
-    final url = Uri.parse('$baseUrl/api/users/me');
+    final url = Uri.parse('$_baseUrl/api/users/me');
 
     final response = await http.get(
       url,
@@ -56,7 +58,7 @@ class UserService {
     final token = prefs.getString("accessToken");
     if (token == null) return false;
 
-    final url = Uri.parse('$baseUrl/api/users/profile');
+    final url = Uri.parse('$_baseUrl/api/users/profile');
 
     final body = jsonEncode({
       "name": name,
@@ -88,6 +90,25 @@ class UserService {
 
     developer.log('UPDATE /profile STATUS: ${res.statusCode} BODY: ${res.body}');
 
+    return res.statusCode == 200;
+  }
+
+  static Future<bool> updateLanguage(String language) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString("accessToken");
+    if (token == null) return false;
+
+    final url = Uri.parse('$_baseUrl/api/users/profile');
+    final res = await http.put(
+      url,
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({"language": language}),
+    );
+
+    developer.log('UPDATE language STATUS: ${res.statusCode} BODY: ${res.body}');
     return res.statusCode == 200;
   }
 }

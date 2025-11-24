@@ -131,6 +131,32 @@ CREATE TABLE IF NOT EXISTS disease_diet_rules (
   FOREIGN KEY(disease_id) REFERENCES disease_profiles(id)
 );
 
+-- LLM condition search history
+CREATE TABLE IF NOT EXISTS disease_search_history (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  query TEXT NOT NULL,
+  answer_json TEXT,
+  referenced_keys TEXT,
+  language TEXT,
+  prompt_snapshot TEXT,
+  response_snapshot TEXT,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
+
+-- AI coach conversation history
+CREATE TABLE IF NOT EXISTS coach_conversation_history (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  question TEXT NOT NULL,
+  answer TEXT,
+  language TEXT,
+  metadata TEXT,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
+
 -- Health tracking tables
 CREATE TABLE IF NOT EXISTS hydration_logs (
   id TEXT PRIMARY KEY,

@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../utils/language_utils.dart';
+
 class User {
   final String id;
   final String email;
@@ -76,7 +78,7 @@ class User {
       gender: map["gender"] ?? "",
       height: (map["height_cm"] ?? map["height"] ?? 0).toDouble(),
       weight: (map["weight_kg"] ?? map["weight"] ?? 0).toDouble(),
-      language: map["language"] ?? "english",
+      language: normalizeLanguage(map["language"]?.toString()),
       targetCalories:
           map["target_calories"] ?? map["targetCalories"] ?? 2000,
       disease: map["disease"],
@@ -131,4 +133,52 @@ class User {
   }
 
   String toJson() => jsonEncode(toMap());
+
+  User copyWith({
+    String? id,
+    String? email,
+    String? name,
+    int? age,
+    String? gender,
+    double? height,
+    double? weight,
+    String? language,
+    int? targetCalories,
+    String? disease,
+    String? disease_key,
+    String? disease_profile_id,
+    String? dietPreference,
+    String? mealType,
+    String? allergies,
+    String? fitnessGoal,
+    String? activityLevel,
+    String? goal,
+    bool? accessibilityMode,
+    List<String>? healthConditions,
+  }) {
+    return User(
+      id: id ?? this.id,
+      email: email ?? this.email,
+      name: name ?? this.name,
+      age: age ?? this.age,
+      gender: gender ?? this.gender,
+      height: height ?? this.height,
+      weight: weight ?? this.weight,
+        language: language != null
+          ? normalizeLanguage(language)
+          : this.language,
+      targetCalories: targetCalories ?? this.targetCalories,
+      disease: disease ?? this.disease,
+      disease_key: disease_key ?? this.disease_key,
+      disease_profile_id: disease_profile_id ?? this.disease_profile_id,
+      dietPreference: dietPreference ?? this.dietPreference,
+      mealType: mealType ?? this.mealType,
+      allergies: allergies ?? this.allergies,
+      fitnessGoal: fitnessGoal ?? this.fitnessGoal,
+      activityLevel: activityLevel ?? this.activityLevel,
+      goal: goal ?? this.goal,
+      accessibilityMode: accessibilityMode ?? this.accessibilityMode,
+      healthConditions: healthConditions ?? List<String>.from(this.healthConditions),
+    );
+  }
 }

@@ -4,6 +4,8 @@ import 'dart:developer' as developer;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'env_service.dart';
+
 class AuthResult {
   final bool success;
   final String? message;
@@ -12,14 +14,14 @@ class AuthResult {
 }
 
 class AuthService {
-  static const String baseUrl = "http://localhost:4000";
+  static String get _baseUrl => EnvService.apiBaseUrl;
 
   // ----------------------------
   // LOGIN
   // ----------------------------
   static Future<AuthResult> login(String email, String password) async {
     try {
-      final url = Uri.parse('$baseUrl/api/auth/login');
+      final url = Uri.parse('$_baseUrl/api/auth/login');
 
       final response = await http.post(
         url,
@@ -28,10 +30,14 @@ class AuthService {
       );
 
       developer.log('AuthService.login status=${response.statusCode} body=${response.body}');
-      final data = jsonDecode(response.body);
+      final data = _safeDecode(response.body);
 
       if (response.statusCode != 200) {
-        return AuthResult(false, data["error"] ?? "Login failed");
+        return AuthResult(false, data?["error"]?.toString() ?? "Login failed");
+      }
+
+      if (data == null) {
+        return AuthResult(false, 'Login failed: unexpected response');
       }
 
       final prefs = await SharedPreferences.getInstance();
@@ -66,7 +72,7 @@ class AuthService {
     int? targetCalories,
   }) async {
     try {
-      final url = Uri.parse("$baseUrl/api/auth/register");
+      final url = Uri.parse("$_baseUrl/api/auth/register");
 
       final body = <String, dynamic>{
         "email": email,
@@ -95,11 +101,14 @@ class AuthService {
       developer.log('REGISTER status=${res.statusCode} body=${res.body}');
 
       if (res.statusCode != 200) {
-        final err = jsonDecode(res.body);
-        return AuthResult(false, err["error"] ?? "Registration failed");
+        final err = _safeDecode(res.body);
+        return AuthResult(false, err?["error"]?.toString() ?? "Registration failed");
       }
 
-      final data = jsonDecode(res.body);
+      final data = _safeDecode(res.body);
+      if (data == null) {
+        return AuthResult(false, "Registration failed: unexpected response");
+      }
 
       final prefs = await SharedPreferences.getInstance();
       prefs.setString("accessToken", data["accessToken"]);
@@ -120,5 +129,18 @@ class AuthService {
   static Future<String?> getAccessToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString("accessToken");
+  }
+}
+
+Map<String, dynamic>? _safeDecode(String body) {
+  try {
+    final decoded = jsonDecode(body);
+    if (decoded is Map<String, dynamic>) {
+      return decoded;
+    }
+    return null;
+  } catch (e) {
+    developer.log('AuthService decode error: $e');
+    return null;
   }
 }

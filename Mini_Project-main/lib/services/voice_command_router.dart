@@ -22,6 +22,8 @@ class VoiceCommandRouter {
         return _summarizeMeal(command.entityAsString('meal_type'));
       case 'generate_meal_plan':
         return _regeneratePlan(ref);
+      case 'add_meal_log':
+        return _openMealLog();
       case 'log_water':
         return _logWater(command.entityAsInt('water_ml'), ref);
       case 'log_sleep':
@@ -123,19 +125,51 @@ class VoiceCommandRouter {
   }
 
   static Future<bool> _searchCondition(String? condition) async {
-    if (condition == null || condition.isEmpty) {
+    final query = condition?.trim();
+    if (query == null || query.isEmpty) {
       await TTSService.speak('Which condition do you want insights for?');
       return false;
     }
-    await AppNavigationService.openScreen('search');
-    await TTSService.speak('Searching guidance for $condition. Use the search bar to refine results.');
-    await DiseaseService.searchDiseases(condition);
-    return true;
+
+    try {
+      final payload = await DiseaseService.getConditionInsights(query);
+      if (payload == null) {
+        await TTSService.speak('I could not find curated insights right now. Please try again.');
+        return false;
+      }
+
+      await AppNavigationService.openScreen('search', args: {'query': query});
+
+      final answer = payload['answer'] as Map<String, dynamic>?;
+      final summary = (answer?['condition_summary'] as String? ?? '').trim();
+      final diet = _firstString(answer?['diet_guidance']);
+      final exercise = _firstString(answer?['exercise_plan']);
+
+      final narration = [
+        'Here is what I found for $query.',
+        if (summary.isNotEmpty) summary,
+        if (diet != null) 'Diet focus: $diet.',
+        if (exercise != null) 'Movement cue: $exercise.',
+      ].join(' ');
+
+      await TTSService.speak(narration.trim());
+      return true;
+    } catch (e) {
+      developer.log('Condition insight error: $e');
+      await TTSService.speak('I could not generate insights for $query right now.');
+      return false;
+    }
   }
 
   static Future<bool> _coachTip(String? topic) async {
     await AppNavigationService.openScreen('coach');
     await TTSService.speak('Opening your AI coach${topic != null ? ' about $topic' : ''}.');
+    return true;
+  }
+
+  static Future<bool> _openMealLog() async {
+    await AppNavigationService.openMealLog();
+    await TTSService.speak('Opening the meal log so you can capture it now.');
     return true;
   }
 
@@ -149,5 +183,20 @@ class VoiceCommandRouter {
     if (value.contains('coach') || value.contains('chat')) return 'coach';
     if (value.contains('analytics')) return 'analytics';
     return 'home';
+  }
+
+  static String? _firstString(dynamic source) {
+    if (source is String && source.trim().isNotEmpty) {
+      return source.trim();
+    }
+    if (source is Iterable) {
+      for (final item in source) {
+        final text = item?.toString().trim();
+        if (text != null && text.isNotEmpty) {
+          return text;
+        }
+      }
+    }
+    return null;
   }
 }

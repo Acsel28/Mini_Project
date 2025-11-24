@@ -30,6 +30,7 @@ dependencies:
   # Accessibility & Voice
   audioplayers: ^6.0.0
   speech_to_text: ^7.3.0
+  permission_handler: ^11.3.1
 
   # Utilities
   intl: ^0.18.1

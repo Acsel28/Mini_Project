@@ -8,25 +8,26 @@ router.get('/user-stats', authMiddleware, (req, res) => {
   const userId = req.user.sub;
   try {
     const user = db.prepare(`
-      SELECT 
-        users.id, 
-        p.name, 
-        p.age, 
-        p.weight_kg, 
-        p.height_cm, 
-        p.target_calories,
-        p.activityLevel,
-        p.healthConditions
-      FROM users
-      LEFT JOIN user_profiles p ON users.id = p.user_id
-      WHERE users.id = ?
-    `).get(userId);
+        SELECT 
+          users.id, 
+          p.name, 
+          p.age, 
+          p.weight_kg, 
+          p.height_cm, 
+          p.target_calories,
+          p.activity_level,
+          p.healthConditions,
+          p.diet_preference
+        FROM users
+        LEFT JOIN user_profiles p ON users.id = p.user_id
+        WHERE users.id = ?
+      `).get(userId);
 
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     // Calculate BMI
-    const height = user.height_cm / 100;
-    const bmi = user.weight_kg / (height * height);
+    const height = user.height_cm ? user.height_cm / 100 : null;
+    const bmi = height && user.weight_kg ? user.weight_kg / (height * height) : 0;
 
     // Calculate BMR
     let bmr = 0;
@@ -44,7 +45,10 @@ router.get('/user-stats', authMiddleware, (req, res) => {
       'extremely_active': 1.9
     };
 
-    const tdee = bmr * (activityMultipliers[user.activityLevel] || 1.55);
+    const activityLevel = user.activity_level || 'moderately_active';
+    const tdee = bmr * (activityMultipliers[activityLevel] || 1.55);
+    const calorieTarget = user.target_calories || Math.round(tdee) || 2000;
+    const macroTargets = estimateMacroTargets(calorieTarget);
 
     res.json({
       user: {
@@ -53,18 +57,22 @@ router.get('/user-stats', authMiddleware, (req, res) => {
         age: user.age,
         weight: user.weight_kg,
         height: user.height_cm,
-        targetCalories: user.target_calories || Math.round(tdee),
-        activityLevel: user.activityLevel
+        targetCalories: calorieTarget,
+        activityLevel
       },
       metrics: {
         bmi: parseFloat(bmi.toFixed(2)),
         bmiCategory: getBMICategory(bmi),
         bmr: parseFloat(bmr.toFixed(2)),
-        tdee: parseFloat(tdee.toFixed(2))
+        tdee: parseFloat(tdee.toFixed(2)),
+        calories: calorieTarget,
+        protein: macroTargets.protein,
+        carbs: macroTargets.carbs,
+        fat: macroTargets.fat
       },
       healthConditions: user.healthConditions ? JSON.parse(user.healthConditions) : [],
       goals: {
-        dailyCalories: user.target_calories || Math.round(tdee),
+        dailyCalories: calorieTarget,
         dailyWater: 3000,
         dailySteps: 10000,
         weeklyWorkout: 150
@@ -81,83 +89,101 @@ router.get('/recommendations', authMiddleware, (req, res) => {
   const userId = req.user.sub;
   try {
     const user = db.prepare(`
-      SELECT 
-        p.name, 
-        p.weight_kg, 
-        p.height_cm,
-        p.age,
-        p.target_calories,
-        p.healthConditions
-      FROM users
-      LEFT JOIN user_profiles p ON users.id = p.user_id
-      WHERE users.id = ?
-    `).get(userId);
+        SELECT 
+          p.name, 
+          p.weight_kg, 
+          p.height_cm,
+          p.age,
+          p.target_calories,
+          p.healthConditions,
+          p.diet_preference,
+          p.activity_level
+        FROM users
+        LEFT JOIN user_profiles p ON users.id = p.user_id
+        WHERE users.id = ?
+      `).get(userId);
 
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const healthConditions = user.healthConditions ? JSON.parse(user.healthConditions) : [];
-    const bmi = user.weight_kg / ((user.height_cm / 100) ** 2);
+    const heightMeters = user.height_cm ? user.height_cm / 100 : null;
+    const bmi = heightMeters && user.weight_kg ? user.weight_kg / (heightMeters ** 2) : 0;
+    const dietPreference = user.diet_preference || 'vegetarian';
+    const activityLevel = user.activity_level || 'moderately_active';
 
     const recommendations = [];
 
-    // Weight-based recommendations
     if (bmi > 25) {
       recommendations.push({
         id: 'weight_loss',
         title: 'Weight Management',
-        description: 'Your BMI suggests focus on gradual weight loss through balanced diet and exercise.',
+        description: 'Your BMI suggests focusing on gradual fat loss via balanced plates and 20-minute walks.',
         priority: 'high',
         icon: 'fitness_center',
         color: 'error'
       });
-    } else if (bmi < 18.5) {
+    } else if (bmi > 0 && bmi < 18.5) {
       recommendations.push({
         id: 'weight_gain',
         title: 'Nutrition Boost',
-        description: 'Consider increasing calorie intake with nutrient-dense foods.',
+        description: 'Add calorie-dense snacks like nuts, paneer paratha, or besan chilla twice a day.',
         priority: 'high',
         icon: 'restaurant',
         color: 'warning'
       });
     }
 
-    // Disease-specific recommendations
     if (healthConditions.length > 0) {
       recommendations.push({
         id: 'disease_diet',
         title: 'Disease-Specific Diet',
-        description: `Customize your meal plan for your ${healthConditions.length} health condition(s).`,
+        description: `Customize your meal plan for ${healthConditions.length} tracked condition(s).`,
         priority: 'high',
         icon: 'medical_services',
         color: 'primary'
       });
     }
 
-    // Hydration
+    recommendations.push({
+      id: 'preference',
+      title: 'Diet Preference',
+      description: `Stick to a ${dietPreference.replace('_', ' ')} rhythm to keep energy stable all week.`,
+      priority: 'medium',
+      icon: 'restaurant',
+      color: 'secondary'
+    });
+
+    recommendations.push({
+      id: 'activity_level',
+      title: 'Movement Reminder',
+      description: `Current activity level: ${activityLevel.replace('_', ' ')}. Add 5-min terrace walks after meals to upgrade it.`,
+      priority: 'medium',
+      icon: 'directions_walk',
+      color: 'info'
+    });
+
     recommendations.push({
       id: 'hydration',
       title: 'Stay Hydrated',
-      description: 'Drink at least 3-4 liters of water daily for optimal health.',
+      description: 'Drink at least 3-4 liters of water or chaas for joint and gut comfort.',
       priority: 'medium',
       icon: 'water_drop',
       color: 'info'
     });
 
-    // Sleep
     recommendations.push({
       id: 'sleep',
       title: 'Sleep Quality',
-      description: 'Aim for 7-9 hours of quality sleep each night for recovery.',
+      description: 'Aim for 7-9 hours nightly; keep devices away 30 minutes before bed.',
       priority: 'medium',
       icon: 'dark_mode',
       color: 'info'
     });
 
-    // Exercise
     recommendations.push({
       id: 'exercise',
       title: 'Regular Exercise',
-      description: 'Aim for at least 150 minutes of moderate activity per week.',
+      description: 'Stack 150 minutes/week of moderate activity using brisk walks + yoga flow.',
       priority: 'medium',
       icon: 'directions_run',
       color: 'success'
@@ -179,22 +205,19 @@ router.get('/meal-suggestions', authMiddleware, (req, res) => {
   const { mealType = 'breakfast', count = 5 } = req.query;
 
   try {
-    // Fetch user profile to get health conditions and preferences
     const user = db.prepare(`
-      SELECT healthConditions, dietPreference, goal
-      FROM user_profiles
-      WHERE user_id = ?
-    `).get(userId);
+        SELECT healthConditions, diet_preference, goal
+        FROM user_profiles
+        WHERE user_id = ?
+      `).get(userId);
 
     if (!user) {
       return res.status(404).json({ error: 'User profile not found' });
     }
 
-    // Parse health conditions
     const healthConditions = user.healthConditions ? JSON.parse(user.healthConditions) : [];
-    const dietPreference = user.dietPreference || 'vegetarian';
+    const dietPreference = user.diet_preference || 'vegetarian';
 
-    // Build query to fetch meals based on type and preferences
     let query = `
       SELECT id, title, calories, protein, carbs, fat, tags
       FROM meals
@@ -202,24 +225,16 @@ router.get('/meal-suggestions', authMiddleware, (req, res) => {
     `;
     const params = [`%${mealType}%`];
 
-    // Filter by diet preference if available
     if (dietPreference && dietPreference !== 'any') {
-      query += ` AND (tags LIKE ? OR tags NOT LIKE ?)`;
-      params.push(`%${dietPreference}%`, '%non-veg%');
+      query += ' AND tags LIKE ?';
+      params.push(`%${dietPreference}%`);
     }
 
-    // Avoid foods if user has specific conditions
-    if (healthConditions.length > 0) {
-      // For now, just fetch all; in production, apply disease diet rules
-      // from disease_diet_rules table
-    }
-
-    query += ` LIMIT ?`;
-    params.push(parseInt(count));
+    query += ' LIMIT ?';
+    params.push(parseInt(count, 10) || 5);
 
     const meals = db.prepare(query).all(...params);
 
-    // If no meals found, return default healthy options
     if (meals.length === 0) {
       return res.json({
         mealType,
@@ -228,11 +243,7 @@ router.get('/meal-suggestions', authMiddleware, (req, res) => {
             id: 'default_1',
             title: `Healthy ${mealType}`,
             calories: mealType === 'breakfast' ? 400 : mealType === 'lunch' ? 600 : 500,
-            macros: {
-              protein: 20,
-              carbs: 50,
-              fat: 15
-            },
+            macros: { protein: 20, carbs: 50, fat: 15 },
             tags: ['healthy', mealType, dietPreference]
           }
         ]
@@ -243,16 +254,16 @@ router.get('/meal-suggestions', authMiddleware, (req, res) => {
       mealType,
       userDietPreference: dietPreference,
       healthConditions,
-      meals: meals.map(m => ({
-        id: m.id,
-        title: m.title,
-        calories: m.calories,
+      meals: meals.map((meal) => ({
+        id: meal.id,
+        title: meal.title,
+        calories: meal.calories,
         macros: {
-          protein: m.protein,
-          carbs: m.carbs,
-          fat: m.fat
+          protein: meal.protein,
+          carbs: meal.carbs,
+          fat: meal.fat
         },
-        tags: m.tags ? m.tags.split(',').map(t => t.trim()) : []
+        tags: meal.tags ? meal.tags.split(',').map((tag) => tag.trim()) : []
       }))
     });
   } catch (err) {
@@ -333,15 +344,14 @@ function getBMICategory(bmi) {
   return 'obese';
 }
 
-// --- AI Coach Endpoint ---
-// POST /api/coach/ask
-router.post('/coach/ask', (req, res) => {
-  const { question } = req.body;
-  // Dummy AI response
-  res.json({
-    answer: `AI Coach says: For your question "${question}", remember to eat balanced meals and stay hydrated!`,
-  });
-});
+function estimateMacroTargets(calories) {
+  const safeCalories = Math.max(Number(calories) || 0, 1200);
+  return {
+    protein: Math.round((safeCalories * 0.3) / 4),
+    carbs: Math.round((safeCalories * 0.4) / 4),
+    fat: Math.round((safeCalories * 0.3) / 9)
+  };
+}
 
 // --- Trends & Prediction Endpoints ---
 // GET /api/analytics/trends
@@ -365,137 +375,6 @@ router.get('/predict', (req, res) => {
       labels: ['Now', '+1w', '+2w', '+3w', 'Goal'],
     },
   });
-});
-
-// --- Health Features Endpoints ---
-// POST /api/analytics/health/hydration
-router.post('/health/hydration', authMiddleware, (req, res) => {
-  try {
-    const userId = req.user.sub;
-    const { amount } = req.body;
-    
-    console.log('Hydration POST - userId:', userId, 'amount:', amount);
-    
-    if (!amount || amount < 0) {
-      return res.status(400).json({ error: 'Invalid amount' });
-    }
-    
-    const id = `hydration_${Date.now()}`;
-    const date = new Date().toISOString().split('T')[0];
-    const time = new Date().toISOString().split('T')[1];
-    
-    db.prepare(`
-      INSERT INTO hydration_logs (id, user_id, amount_ml, date, time, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, userId, amount, date, time, Date.now());
-    
-    console.log('Hydration logged successfully - id:', id);
-    res.json({ status: 'ok', message: 'Hydration logged!', id });
-  } catch (err) {
-    console.error('Hydration logging error:', err);
-    res.status(500).json({ error: 'Server error', details: err.message });
-  }
-});
-
-// POST /api/analytics/health/sleep
-router.post('/health/sleep', authMiddleware, (req, res) => {
-  try {
-    const userId = req.user.sub;
-    const { hours, quality } = req.body;
-    
-    console.log('Sleep POST - userId:', userId, 'hours:', hours, 'quality:', quality);
-    
-    if (!hours || hours < 0) {
-      return res.status(400).json({ error: 'Invalid hours' });
-    }
-    
-    const id = `sleep_${Date.now()}`;
-    const date = new Date().toISOString().split('T')[0];
-    
-    db.prepare(`
-      INSERT INTO sleep_logs (id, user_id, hours, date, quality, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, userId, hours, date, quality || 'good', Date.now());
-    
-    console.log('Sleep logged successfully - id:', id);
-    res.json({ status: 'ok', message: 'Sleep logged!', id });
-  } catch (err) {
-    console.error('Sleep logging error:', err);
-    res.status(500).json({ error: 'Server error', details: err.message });
-  }
-});
-
-// GET /api/analytics/health/hydration-summary (today's hydration)
-router.get('/health/hydration-summary', authMiddleware, (req, res) => {
-  const userId = req.user.sub;
-  try {
-    const date = new Date().toISOString().split('T')[0];
-    console.log('Fetching hydration for userId:', userId, 'date:', date);
-    
-    const logs = db.prepare(`
-      SELECT amount_ml, time FROM hydration_logs
-      WHERE user_id = ? AND date = ?
-      ORDER BY time DESC
-    `).all(userId, date);
-    
-    const totalToday = logs.reduce((sum, log) => sum + log.amount_ml, 0);
-    const goal = 3000;
-    
-    console.log('Hydration summary - totalToday:', totalToday, 'logs:', logs.length);
-    
-    res.json({
-      totalToday,
-      goal,
-      percentage: Math.min((totalToday / goal) * 100, 100),
-      logs: logs.map(l => ({ amount: l.amount_ml, time: l.time }))
-    });
-  } catch (err) {
-    console.error('Hydration summary error:', err);
-    res.status(500).json({ error: 'Server error', details: err.message });
-  }
-});
-
-// GET /api/analytics/health/sleep-summary (today's sleep)
-router.get('/health/sleep-summary', authMiddleware, (req, res) => {
-  const userId = req.user.sub;
-  try {
-    const date = new Date().toISOString().split('T')[0];
-    console.log('Fetching sleep for userId:', userId, 'date:', date);
-    
-    const sleep = db.prepare(`
-      SELECT hours, quality FROM sleep_logs
-      WHERE user_id = ? AND date = ?
-      LIMIT 1
-    `).get(userId, date);
-    
-    console.log('Sleep summary - sleep:', sleep);
-    
-    res.json({
-      hours: sleep?.hours || 0,
-      quality: sleep?.quality || 'not_logged',
-      goalHours: 8,
-      message: sleep ? 
-        (sleep.hours >= 7 ? 'Great sleep! You got enough rest.' : 'Try to get more sleep tonight.') :
-        'No sleep logged yet today.'
-    });
-  } catch (err) {
-    console.error('Sleep summary error:', err);
-    res.status(500).json({ error: 'Server error', details: err.message });
-  }
-});
-
-// GET/POST /api/health/checklist
-router.get('/health/checklist', authMiddleware, (req, res) => {
-  res.json({ checklist: [
-    { label: 'Drank 2L water', done: true },
-    { label: 'Ate 5 servings of veggies', done: false },
-    { label: 'Slept 7+ hours', done: true },
-    { label: 'Walked 8,000+ steps', done: false },
-  ] });
-});
-router.post('/health/checklist', authMiddleware, (req, res) => {
-  // Accepts { label, done }
-  res.json({ status: 'ok', message: 'Checklist updated!' });
 });
 
 // GET /api/analytics/dynamic-insights (based on logged data)

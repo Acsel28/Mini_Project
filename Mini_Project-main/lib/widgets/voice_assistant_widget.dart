@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../services/tts_service.dart';
+import '../services/voice_assistant_service.dart';
 
 class VoiceAssistantWidget extends StatefulWidget {
   const VoiceAssistantWidget({Key? key}) : super(key: key);
@@ -11,7 +11,6 @@ class VoiceAssistantWidget extends StatefulWidget {
 }
 
 class _VoiceAssistantWidgetState extends State<VoiceAssistantWidget> with SingleTickerProviderStateMixin {
-  late stt.SpeechToText _speech;
   bool _isListening = false;
   String _text = '';
   late AnimationController _waveController;
@@ -20,7 +19,6 @@ class _VoiceAssistantWidgetState extends State<VoiceAssistantWidget> with Single
   @override
   void initState() {
     super.initState();
-    _speech = stt.SpeechToText();
     _waveController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -37,19 +35,38 @@ class _VoiceAssistantWidgetState extends State<VoiceAssistantWidget> with Single
   }
 
   Future<void> _listen() async {
-    if (!_isListening) {
-      bool available = await _speech.initialize();
-      if (available) {
-        setState(() => _isListening = true);
-        _speech.listen(
-          onResult: (val) => setState(() {
-            _text = val.recognizedWords;
-          }),
-        );
-      }
-    } else {
+    if (_isListening) {
+      await VoiceAssistantService.stopListening();
+      if (mounted) setState(() => _isListening = false);
+      return;
+    }
+
+    final granted = await VoiceAssistantService.ensureMicPermission();
+    if (!granted) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Microphone permission is required to capture your voice.')),
+      );
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isListening = true;
+        _text = 'Listening...';
+      });
+    }
+
+    await VoiceAssistantService.startListening(
+      (transcript) {
+        if (!mounted) return;
+        setState(() => _text = transcript);
+      },
+      listenFor: const Duration(seconds: 6),
+    );
+
+    if (mounted) {
       setState(() => _isListening = false);
-      _speech.stop();
     }
   }
 

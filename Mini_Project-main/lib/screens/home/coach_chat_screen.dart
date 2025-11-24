@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme.dart';
 import '../../providers/user_provider.dart';
-import '../../services/ai_content_service.dart';
+import '../../services/coach_service.dart';
 import '../../widgets/wellness_scaffold.dart';
 
 class CoachChatScreen extends ConsumerStatefulWidget {
@@ -42,13 +42,25 @@ class _CoachChatScreenState extends ConsumerState<CoachChatScreen> {
 
     try {
       final user = ref.read(userProvider);
-      final reply = await AiContentService.getCoachResponse(
-        userMessage: text,
-        history: _messages.map((m) => m.toMap()).toList(),
-        user: user,
+      final historyMaps = _messages.length > 1
+          ? _messages
+              .sublist(0, _messages.length - 1)
+              .map((m) => m.toMap())
+              .toList()
+          : const <Map<String, String>>[];
+      final reply = await CoachService.askCoach(
+        question: text,
+        history: historyMaps,
+        language: user?.language,
       );
       setState(() {
-        _messages.add(_ChatMessage(role: 'coach', text: reply));
+        _messages.add(_ChatMessage(
+          role: 'coach',
+          text: reply ??
+              (user?.language == 'hi'
+                  ? 'मुझे जवाब तैयार करने में दिक्कत आ रही है, कृपया थोड़ी देर बाद दोबारा पूछें।'
+                  : 'I ran into an issue responding, please try again shortly.'),
+        ));
         _isSending = false;
       });
     } catch (e) {

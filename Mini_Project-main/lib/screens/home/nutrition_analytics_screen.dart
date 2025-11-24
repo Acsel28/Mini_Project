@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants.dart';
 import '../../core/theme.dart';
 import '../../models/meal_model.dart';
 import '../../providers/meal_provider.dart';
+import '../../providers/user_provider.dart';
 import '../../widgets/app_styles_extended.dart';
 import '../../widgets/reusable_components.dart';
 import '../../widgets/wellness_scaffold.dart';
+import 'meal_selection_screen.dart';
 
 class NutritionAnalyticsScreen extends ConsumerStatefulWidget {
   const NutritionAnalyticsScreen({super.key});
@@ -20,6 +23,8 @@ class _NutritionAnalyticsScreenState
   @override
   Widget build(BuildContext context) {
     final mealPlan = ref.watch(mealPlanProvider);
+    final user = ref.watch(userProvider);
+    final dailyTarget = user?.targetCalories ?? AppConstants.defaultDailyCalories;
 
     return WellnessScaffold(
       title: 'Nutrition analytics',
@@ -38,6 +43,7 @@ class _NutritionAnalyticsScreenState
                 title: 'No meal data',
                 message: 'Log today’s meals to unlock rich insights',
                 buttonText: 'Plan meals',
+                onButtonTap: () => _openMealPlanner(context),
               ),
             )
           : SingleChildScrollView(
@@ -45,7 +51,7 @@ class _NutritionAnalyticsScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildDailySummary(mealPlan),
+                  _buildDailySummary(mealPlan, dailyTarget),
                   AppStylesExtended.gapXxl,
                   _buildMacroBreakdown(mealPlan),
                   AppStylesExtended.gapXxl,
@@ -60,10 +66,12 @@ class _NutritionAnalyticsScreenState
     );
   }
 
-  Widget _buildDailySummary(MealPlan mealPlan) {
+  Widget _buildDailySummary(MealPlan mealPlan, int targetCalories) {
     final totalCalories = mealPlan.totalCalories;
-    const dailyTarget = 2000;
-    final percentageOfTarget = (totalCalories / dailyTarget * 100).clamp(0, 200);
+    final normalizedTarget = targetCalories > 0 ? targetCalories : AppConstants.defaultDailyCalories;
+    final percentageOfTarget = normalizedTarget > 0
+        ? (totalCalories / normalizedTarget * 100).clamp(0, 200)
+        : 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,7 +108,7 @@ class _NutritionAnalyticsScreenState
                         ),
                         AppStylesExtended.gapSm,
                         Text(
-                          'of $dailyTarget kcal/day',
+                          'of $normalizedTarget kcal/day',
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.textTertiary,
@@ -140,9 +148,9 @@ class _NutritionAnalyticsScreenState
                         ],
                       ),
                       AppStylesExtended.gapMd,
-                      if (totalCalories < dailyTarget)
+                      if (totalCalories < normalizedTarget)
                         Text(
-                          '${(dailyTarget - totalCalories).toStringAsFixed(0)} kcal left',
+                          '${(normalizedTarget - totalCalories).toStringAsFixed(0)} kcal left',
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.success,
@@ -151,7 +159,7 @@ class _NutritionAnalyticsScreenState
                         )
                       else
                         Text(
-                          '+${(totalCalories - dailyTarget).toStringAsFixed(0)} kcal',
+                          '+${(totalCalories - normalizedTarget).toStringAsFixed(0)} kcal',
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.warning,
@@ -441,6 +449,12 @@ class _NutritionAnalyticsScreenState
       initialDate: DateTime.now(),
       firstDate: DateTime.now().subtract(const Duration(days: 30)),
       lastDate: DateTime.now(),
+    );
+  }
+
+  void _openMealPlanner(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const MealSelectionScreen()),
     );
   }
 }

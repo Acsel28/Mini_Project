@@ -1,3 +1,5 @@
+import 'meal_model.dart';
+
 class AiSmartSuggestion {
   AiSmartSuggestion({
     required this.title,
@@ -170,6 +172,39 @@ class MealStudioIdea {
       macros: macroMap.map((key, value) => MapEntry(key, (value as num).toDouble())),
       tags: (json['tags'] as List<dynamic>? ?? const []).map((e) => e.toString()).toList(),
       steps: (json['steps'] as List<dynamic>? ?? const []).map((e) => e.toString()).toList(),
+    );
+  }
+
+  Meal toMeal({required String slot}) {
+    final normalizedSlot = slot.toLowerCase();
+    final ingredientTags = tags.isNotEmpty ? List<String>.from(tags) : [name];
+    final instructionSteps = steps.isNotEmpty
+        ? List<String>.from(steps)
+        : (description.isNotEmpty ? [description] : ['Enjoy as described']);
+
+    final lowerTags = ingredientTags.map((tag) => tag.toLowerCase());
+    final isNonVeg = lowerTags.any((tag) =>
+        tag.contains('non-veg') || tag.contains('chicken') || tag.contains('fish') || tag.contains('egg'));
+    final isVeganTagged = lowerTags.any((tag) => tag.contains('vegan'));
+
+    final cookMinutes = instructionSteps.isNotEmpty ? instructionSteps.length * 5 : 15;
+
+    return Meal(
+      id: 'logged_${DateTime.now().millisecondsSinceEpoch}',
+      name: name,
+      category: normalizedSlot,
+      calories: calories,
+      protein: macros['protein'] ?? 0,
+      carbs: macros['carbs'] ?? 0,
+      fat: macros['fat'] ?? 0,
+      ingredients: ingredientTags,
+      instructions: instructionSteps,
+      cookTime: '$cookMinutes min',
+      difficulty: 'Easy',
+      cuisine: 'Indian home style',
+      isVegetarian: !isNonVeg,
+      isVegan: isVeganTagged,
+      createdAt: DateTime.now(),
     );
   }
 }

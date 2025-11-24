@@ -8,11 +8,12 @@ import '../screens/home/progress_screen.dart';
 import '../screens/home/dynamic_health_search_screen.dart';
 import '../screens/home/coach_chat_screen.dart';
 import '../screens/home/nutrition_analytics_screen.dart';
+import '../screens/home/meal_selection_screen.dart';
 
 class AppNavigationService {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-  static Future<void> openScreen(String screenId) async {
+  static Future<void> openScreen(String screenId, {Map<String, dynamic>? args}) async {
     final navigator = navigatorKey.currentState;
     if (navigator == null) return;
 
@@ -29,7 +30,7 @@ class AppNavigationService {
         case 'progress':
           return const ProgressScreen();
         case 'search':
-          return const DynamicHealthSearchScreen();
+          return DynamicHealthSearchScreen(initialQuery: args != null ? args['query'] as String? : null);
         case 'coach':
           return const CoachChatScreen();
         case 'analytics':
@@ -40,5 +41,11 @@ class AppNavigationService {
     }
 
     await navigator.push(MaterialPageRoute(builder: (_) => builder()));
+  }
+
+  static Future<void> openMealLog() async {
+    final navigator = navigatorKey.currentState;
+    if (navigator == null) return;
+    await navigator.push(MaterialPageRoute(builder: (_) => const MealSelectionScreen()));
   }
 }

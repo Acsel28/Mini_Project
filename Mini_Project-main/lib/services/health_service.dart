@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
+import 'env_service.dart';
 
 class HealthService {
-  static const String _baseUrl = 'http://localhost:4000/api/health';
+  static String get _baseUrl => '${EnvService.apiBaseUrl}/api/health';
 
   static Future<bool> logHydration(int amount) async {
     try {

@@ -3,8 +3,8 @@ import 'dart:developer' as developer;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:permission_handler/permission_handler.dart';
 
-import 'disease_service.dart';
 import 'meal_service.dart';
 import 'tts_service.dart';
 import 'user_service.dart';
@@ -19,6 +19,27 @@ class VoiceAssistantService {
   static bool _listening = false;
   static int _lastStepIndex = 0;
   static List<String> _lastSteps = [];
+
+  static Future<bool> ensureMicPermission({bool request = true}) async {
+    var status = await Permission.microphone.status;
+    if (status.isGranted) return true;
+    if (!request && status.isPermanentlyDenied) return false;
+
+    if (status.isDenied || status.isRestricted || status.isLimited || status.isPermanentlyDenied) {
+      status = await Permission.microphone.request();
+    }
+
+    return status.isGranted;
+  }
+
+  static Future<bool> _guardMicrophone({Function(String)? onTranscript}) async {
+    final granted = await ensureMicPermission();
+    if (granted) return true;
+
+    onTranscript?.call('Microphone permission required');
+    await TTSService.speak('I need access to your microphone to keep listening. Please enable it in settings.');
+    return false;
+  }
 
   static Future<void> init() async {
     if (_initialized) return;
@@ -39,6 +60,7 @@ class VoiceAssistantService {
     WidgetRef? ref,
     Duration listenFor = const Duration(seconds: 12),
   }) async {
+    if (!await _guardMicrophone(onTranscript: onTranscript)) return;
     await init();
     if (!_speechReady) {
       onTranscript('Voice input unavailable');
@@ -78,6 +100,7 @@ class VoiceAssistantService {
     String? prompt,
     Duration listenFor = const Duration(seconds: 5),
   }) async {
+    if (!await _guardMicrophone()) return null;
     await init();
     if (!_speechReady) return null;
     if (prompt != null) await TTSService.speak(prompt);
@@ -203,21 +226,22 @@ class VoiceAssistantService {
     if (lower.contains('show exercises') || lower.contains('exercises for') || lower.contains('exercise for')) {
       final key = detectDiseaseKey(lower);
       if (key == null) {
-        await TTSService.speak('Which condition should I show exercises for? For example: knee pain or lower back pain.');
+        await TTSService.speak('Which condition should I focus on? For example: knee pain or lower back pain.');
         return;
       }
-      await TTSService.speak('Showing exercises for $key');
-      final result = await DiseaseService.getExercisesForDisease(key);
-      if (result != null) {
-        final recs = result['recommendedExercises'] as List<dynamic>? ?? [];
-        if (recs.isEmpty) {
-          await TTSService.speak('No recommended exercises listed.');
-        } else {
-          final recNames = recs.map((e) => e['name']).take(5).join(', ');
-          await TTSService.speak('Recommended: $recNames');
-        }
-      } else {
-        await TTSService.speak('No exercises found for that condition.');
+      final query = key.replaceAll('_', ' ');
+      final handled = await _handleConditionQuery(query, ref: ref);
+      if (!handled) {
+        await TTSService.speak('I could not fetch insights right now. Please try again in a moment.');
+      }
+      return;
+    }
+
+    if (lower.contains('analytics')) {
+      final intent = VoiceCommandResult(intent: 'open_screen', entities: const {'screen': 'analytics'});
+      final handled = await VoiceCommandRouter.execute(intent, ref: ref);
+      if (!handled) {
+        await TTSService.speak('I could not open analytics just yet.');
       }
       return;
     }
@@ -242,12 +266,20 @@ class VoiceAssistantService {
     }
 
     // Fallback
-    await TTSService.speak('Sorry, I did not understand that command. Try: Generate my meal plan, What\'s today\'s breakfast, or Show exercises for knee pain');
+    await TTSService.speak('Sorry, I did not understand that command. Try: Generate my meal plan, Add meal log, What\'s today\'s breakfast, or Show exercises for knee pain');
   }
 
   // Allow UI to provide the current step list for navigation with voice
   static void setLastSteps(List<String> steps) {
     _lastSteps = steps;
     _lastStepIndex = 0;
+  }
+
+  static Future<bool> _handleConditionQuery(String query, {WidgetRef? ref}) async {
+    final synthetic = VoiceCommandResult(
+      intent: 'search_condition',
+      entities: {'condition': query},
+    );
+    return VoiceCommandRouter.execute(synthetic, ref: ref);
   }
 }

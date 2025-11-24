@@ -4,13 +4,15 @@ import 'dart:developer' as developer;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'env_service.dart';
+
 class MealPlanService {
-  static const String baseUrl = 'http://localhost:4000';
+  static String get _baseUrl => EnvService.apiBaseUrl;
 
   static Future<Map<String, dynamic>?> generateForUser() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('accessToken');
-    final url = Uri.parse('$baseUrl/api/mealplan/generate');
+    final url = Uri.parse('$_baseUrl/api/mealplan/generate');
 
     final res = await http.post(url, headers: {
       'Content-Type': 'application/json',

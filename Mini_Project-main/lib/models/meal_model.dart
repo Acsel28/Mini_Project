@@ -149,4 +149,53 @@ class MealPlan {
       totalFat: totalFat,
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'date': date.toIso8601String(),
+      'breakfast': breakfast?.toMap(),
+      'lunch': lunch?.toMap(),
+      'dinner': dinner?.toMap(),
+      'snacks': snacks.map((meal) => meal.toMap()).toList(),
+    };
+  }
+
+  factory MealPlan.fromMap(Map<String, dynamic> map) {
+    Meal? parseMeal(dynamic data) {
+      if (data == null) return null;
+      if (data is Map<String, dynamic>) return Meal.fromMap(data);
+      if (data is Map) {
+        return Meal.fromMap(Map<String, dynamic>.from(data));
+      }
+      return null;
+    }
+
+    final snacksList = (map['snacks'] as List<dynamic>? ?? const [])
+        .map(parseMeal)
+        .whereType<Meal>()
+        .toList();
+
+    final dateString = map['date']?.toString();
+    final parsedDate = dateString != null ? DateTime.tryParse(dateString) : null;
+
+    return MealPlan.fromMeals(
+      id: map['id']?.toString() ?? '',
+      date: parsedDate ?? DateTime.now(),
+      breakfast: parseMeal(map['breakfast']),
+      lunch: parseMeal(map['lunch']),
+      dinner: parseMeal(map['dinner']),
+      snacks: snacksList,
+    );
+  }
+
+  String toJson() => json.encode(toMap());
+
+  factory MealPlan.fromJson(String source) {
+    final decoded = json.decode(source);
+    if (decoded is Map<String, dynamic>) {
+      return MealPlan.fromMap(decoded);
+    }
+    return MealPlan.fromMap(Map<String, dynamic>.from(decoded));
+  }
 }

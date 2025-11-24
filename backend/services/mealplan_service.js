@@ -1,5 +1,37 @@
 const db = require('../db/database');
 
+function parseJsonArray(payload, fallback = []) {
+  try {
+    const parsed = JSON.parse(payload);
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch (err) {
+    return fallback;
+  }
+}
+
+function toMealPayload(row) {
+  if (!row) return null;
+  let recipe = {};
+  if (row.recipe_json) {
+    try {
+      recipe = JSON.parse(row.recipe_json);
+    } catch (err) {
+      recipe = {};
+    }
+  }
+  return {
+    id: row.id,
+    title: row.title,
+    calories: row.calories || 0,
+    protein: row.protein || 0,
+    carbs: row.carbs || 0,
+    fat: row.fat || 0,
+    ingredients: row.ingredients_json ? parseJsonArray(row.ingredients_json, []) : [],
+    recipe,
+    tags: (row.tags || '').split(',').map((t) => t.trim()).filter(Boolean),
+  };
+}
+
 function getUserProfile(userId) {
   return db.prepare('SELECT * FROM user_profiles WHERE user_id = ?').get(userId);
 }
@@ -154,17 +186,7 @@ async function generateMealPlan(userId) {
   const macros = calculateMacrosForMeals(planSlots);
 
   // transform meals to JSON-friendly objects - include recipe, instructions
-  const toMealObject = (m) => ({
-    id: m.id,
-    title: m.title,
-    calories: m.calories,
-    protein: m.protein,
-    carbs: m.carbs,
-    fat: m.fat,
-    ingredients: m.ingredients_json ? JSON.parse(m.ingredients_json) : [],
-    recipe: m.recipe_json ? JSON.parse(m.recipe_json) : {},
-    tags: (m.tags || '').split(',').map(t => t.trim()).filter(Boolean)
-  });
+  const toMealObject = (m) => toMealPayload(m);
 
   return {
     userId,
@@ -181,5 +203,36 @@ async function generateMealPlan(userId) {
 }
 
 module.exports = {
-  generateMealPlan
+  generateMealPlan,
+  searchMealsByIngredients
 };
+
+function searchMealsByIngredients(ingredients = [], { limit = 8 } = {}) {
+  if (!Array.isArray(ingredients) || ingredients.length === 0) return [];
+  const requested = ingredients
+    .map((item) => item && item.toString().trim().toLowerCase())
+    .filter(Boolean);
+
+  if (!requested.length) return [];
+
+  const rows = db.prepare('SELECT * FROM meals LIMIT 600').all();
+  const scored = rows
+    .map((row) => {
+      const mealIngredients = row.ingredients_json
+        ? parseJsonArray(row.ingredients_json, []).map((i) => i.toLowerCase())
+        : [];
+      const hits = requested.filter((term) =>
+        mealIngredients.some((ingredient) => ingredient.includes(term))
+      ).length;
+      return { row, hits };
+    })
+    .filter((entry) => entry.hits > 0)
+    .sort((a, b) => {
+      if (b.hits !== a.hits) return b.hits - a.hits;
+      return (b.row.protein || 0) - (a.row.protein || 0);
+    })
+    .slice(0, limit)
+    .map((entry) => ({ ...toMealPayload(entry.row), matchCount: entry.hits }));
+
+  return scored;
+}

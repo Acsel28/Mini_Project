@@ -28,7 +28,7 @@ class AiCommandService {
 
 JSON shape:
 {
-  "intent": "open_screen" | "summarize_meal_plan" | "generate_meal_plan" | "log_water" | "log_sleep" | "search_condition" | "coach_tip" | "help",
+  "intent": "open_screen" | "summarize_meal_plan" | "generate_meal_plan" | "add_meal_log" | "log_water" | "log_sleep" | "search_condition" | "coach_tip" | "help",
   "entities": {
     "screen"?: string (home|insights|progress|profile|coach|search|analytics|ingredients),
     "meal_type"?: string (breakfast|lunch|dinner),
@@ -45,6 +45,7 @@ Guidance:
 - Choose "open_screen" for navigation verbs (open, go to, show) and map synonyms like "analytics", "coach chat" accordingly.
 - "summarize_meal_plan" when user asks about meals ("what's for breakfast", "tell me lunch"). Include meal_type if implied; default breakfast.
 - "generate_meal_plan" for regenerate/create/update meal plan requests.
+- "add_meal_log" when user says add/log/save a meal or wants the meal logging screen. No extra entities needed.
 - "log_water" when user logs drinks; infer 250ml if missing amount.
 - "log_sleep" for sleep tracking; infer 7 hours if unspecified.
 - "search_condition" for health issue lookups (symptoms, diseases, conditions keyword).

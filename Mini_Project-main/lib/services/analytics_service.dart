@@ -3,9 +3,10 @@ import 'dart:developer' as developer;
 
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
+import 'env_service.dart';
 
 class AnalyticsService {
-  static const String baseUrl = 'http://localhost:4000/api/analytics';
+  static String get _baseUrl => '${EnvService.apiBaseUrl}/api/analytics';
 
   static Future<Map<String, dynamic>?> getUserStats() async {
     try {
@@ -13,7 +14,7 @@ class AnalyticsService {
       if (token == null) return null;
 
       final response = await http.get(
-        Uri.parse('$baseUrl/user-stats'),
+        Uri.parse('$_baseUrl/user-stats'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 10));
 
@@ -33,7 +34,7 @@ class AnalyticsService {
       if (token == null) return null;
 
       final response = await http.get(
-        Uri.parse('$baseUrl/recommendations'),
+        Uri.parse('$_baseUrl/recommendations'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 10));
 
@@ -57,7 +58,7 @@ class AnalyticsService {
       if (token == null) return null;
 
       final response = await http.get(
-        Uri.parse('$baseUrl/meal-suggestions?mealType=$mealType&count=$count'),
+        Uri.parse('$_baseUrl/meal-suggestions?mealType=$mealType&count=$count'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 10));
 
@@ -77,7 +78,7 @@ class AnalyticsService {
       if (token == null) return null;
 
       final response = await http.get(
-        Uri.parse('$baseUrl/health-insights'),
+        Uri.parse('$_baseUrl/health-insights'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 10));
 
@@ -100,7 +101,7 @@ class AnalyticsService {
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/coach-response'),
+        Uri.parse('$_baseUrl/coach-response'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -126,7 +127,7 @@ class AnalyticsService {
         if (token == null) return null;
 
         final response = await http.get(
-          Uri.parse('$baseUrl/coach-responses'),
+          Uri.parse('$_baseUrl/coach-responses'),
           headers: {'Authorization': 'Bearer $token'},
         ).timeout(const Duration(seconds: 10));
 

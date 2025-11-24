@@ -2,6 +2,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import '../core/constants.dart';
+import '../utils/language_utils.dart';
 
 class StorageService {
   static SharedPreferences? _prefs;
@@ -36,11 +37,11 @@ class StorageService {
   }
 
   static Future<void> saveLanguage(String language) async {
-    await _prefs?.setString(AppConstants.languageKey, language);
+    await _prefs?.setString(AppConstants.languageKey, normalizeLanguage(language));
   }
 
   static Future<String> getLanguage() async {
-    return _prefs?.getString(AppConstants.languageKey) ?? 'english';
+    return normalizeLanguage(_prefs?.getString(AppConstants.languageKey));
   }
 
   static Future<void> setAccessibilityMode(bool enabled) async {

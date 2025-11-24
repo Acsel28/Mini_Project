@@ -4,6 +4,7 @@ import '../../core/design_system.dart';
 import '../../core/theme.dart';
 import '../../models/ai_content_models.dart';
 import '../../providers/ai_content_provider.dart';
+import '../../providers/meal_provider.dart';
 import '../../widgets/wellness_scaffold.dart';
 
 // State provider for selected meal type
@@ -76,7 +77,7 @@ class MealSelectionScreen extends ConsumerWidget {
                   itemCount: ideas.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 16),
                   itemBuilder: (context, index) {
-                    return _buildMealCard(context, ideas[index]);
+                    return _buildMealCard(context, ref, ideas[index], selectedMealType);
                   },
                 );
               },
@@ -89,7 +90,7 @@ class MealSelectionScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildMealCard(BuildContext context, MealStudioIdea idea) {
+  Widget _buildMealCard(BuildContext context, WidgetRef ref, MealStudioIdea idea, String mealType) {
     final protein = (idea.macros['protein'] ?? 0).toInt();
     final carbs = (idea.macros['carbs'] ?? 0).toInt();
     final fat = (idea.macros['fat'] ?? 0).toInt();
@@ -167,12 +168,19 @@ class MealSelectionScreen extends ConsumerWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final meal = idea.toMeal(slot: mealType);
+                final success = await ref.read(mealPlanProvider.notifier).logMeal(meal, slot: mealType);
+                messenger.showSnackBar(
                   SnackBar(
-                    content: Text('Added ${idea.name} to your meal plan'),
-                    backgroundColor: AppColors.primary,
-                    duration: const Duration(seconds: 2),
+                    content: Text(
+                      success
+                          ? '${idea.name} logged for ${mealType.toUpperCase()}. Calorie progress updated.'
+                          : 'Could not log that meal. Please try again.',
+                    ),
+                    backgroundColor: success ? AppColors.primary : AppColors.error,
+                    duration: const Duration(seconds: 3),
                   ),
                 );
               },

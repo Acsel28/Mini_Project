@@ -4,6 +4,7 @@ import '../../core/theme.dart';
 import '../../core/constants.dart';
 import '../../core/design_system.dart';
 import '../../providers/user_provider.dart';
+import '../../services/storage_service.dart';
 import '../../services/tts_service.dart';
 import '../../services/disease_service.dart';
 import '../../widgets/custom_button.dart';
@@ -600,6 +601,7 @@ void _completeOnboarding() async {
 
   // 4️⃣ Save in provider
   await userNotifier.setUser(updatedUser);
+  await StorageService.saveLanguage(_selectedLanguage);
 
     // 5️⃣ Navigate to home
     if (mounted) {

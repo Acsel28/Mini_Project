@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme.dart';
 import '../../core/design_system.dart';
+import '../../models/meal_model.dart';
+import '../../models/recipe_suggestions_model.dart';
 import '../../providers/meal_provider.dart';
 import '../../widgets/meal_card.dart';
 import '../../widgets/custom_button.dart';
@@ -226,28 +228,47 @@ class _IngredientsScreenState extends ConsumerState<IngredientsScreen> {
     );
   }
 
-  Widget _buildRecipeSuggestions(AsyncValue<List> recipeSuggestions) {
+  Widget _buildRecipeSuggestions(AsyncValue<RecipeSuggestionsResult> recipeSuggestions) {
     return recipeSuggestions.when(
-      data: (recipes) {
-        if (recipes.isEmpty) return const SizedBox();
+      data: (result) {
+        if (result.isEmpty) return const SizedBox();
+
+        final showPantryRail = result.isAiChef && result.pantryMatches.isNotEmpty;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Recipe Suggestions',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-
-            ...recipes.map((recipe) => Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: MealCard(
-                meal: recipe,
-                mealType: 'Recipe',
-                color: AppColors.secondary,
+            _buildResultMetadata(result),
+            const SizedBox(height: 20),
+            if (result.recipes.isNotEmpty) ...[
+              const Text(
+                'Recipe Suggestions',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-            )),
+              const SizedBox(height: 16),
+              ...result.recipes.map((recipe) => Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: MealCard(
+                      meal: recipe,
+                      mealType: 'Recipe',
+                      color: AppColors.secondary,
+                    ),
+                  )),
+            ] else ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: AppStyles.cardDecoration,
+                child: const Text(
+                  'No exact recipe matches yet — try adding one more ingredient or tapping quick selections.',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+            if (showPantryRail) ...[
+              const SizedBox(height: 24),
+              _buildPantryMatches(result.pantryMatches),
+            ],
           ],
         );
       },
@@ -260,6 +281,101 @@ class _IngredientsScreenState extends ConsumerState<IngredientsScreen> {
         ),
         child: Text('Error loading recipes: $error'),
       ),
+    );
+  }
+
+  Widget _buildResultMetadata(RecipeSuggestionsResult result) {
+    final isAi = result.isAiChef;
+    final borderColor = isAi ? AppColors.primary : AppColors.secondary;
+    final icon = isAi ? Icons.auto_awesome : Icons.inventory_2_rounded;
+    final label = isAi ? 'AI Chef suggestions' : 'Pantry smart matches';
+    final subtitle = isAi
+        ? 'Crafted with ${result.ingredients.length} pantry items'
+        : 'Showing best matches from your stored meals';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: AppStyles.cardDecoration.copyWith(
+        border: Border(left: BorderSide(color: borderColor, width: 3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: borderColor),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          if (result.topIngredients.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: result.topIngredients
+                  .map((ingredient) => Chip(
+                        avatar: const Icon(Icons.check, size: 16),
+                        label: Text(ingredient),
+                        backgroundColor: AppColors.surfaceAlt,
+                      ))
+                  .toList(),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Text(
+            'Source: ${isAi ? 'Groq AI pantry chef' : 'Local pantry knowledge base'}',
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPantryMatches(List<Meal> meals) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: const BoxDecoration(
+                color: AppColors.surfaceAlt,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.kitchen_outlined, color: AppColors.primaryDark, size: 18),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Pantry backups',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...meals.map((meal) => Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: MealCard(
+                meal: meal,
+                mealType: 'Pantry match',
+                color: AppColors.primary,
+              ),
+            )),
+      ],
     );
   }
 
@@ -306,6 +422,15 @@ class _IngredientsScreenState extends ConsumerState<IngredientsScreen> {
   }
 
   Future<void> _startVoiceInput() async {
+    final granted = await VoiceAssistantService.ensureMicPermission();
+    if (!granted) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enable microphone access to dictate ingredients.')),
+      );
+      return;
+    }
+
     await TTSService.speak('Ready for your ingredients');
     final transcript = await VoiceAssistantService.captureSingleCommand(
       listenFor: const Duration(seconds: 6),

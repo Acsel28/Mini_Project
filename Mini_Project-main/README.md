@@ -7,6 +7,7 @@ A complete, production-ready Flutter mobile application for AI-powered diet reco
 ### Core Features
 - **AI-Powered Meal Planning**: Personalized daily meal plans based on user goals and preferences
 - **Ingredient-Based Recipe Generation**: Input available ingredients to get AI recipe suggestions
+- **Pantry Assistant Badge**: Groq-powered PantryChef with automatic pantry fallbacks plus metadata chips
 - **Regional Language Support**: English and Hindi with proper TTS integration
 - **Full Accessibility**: Voice-first mode, screen reader support, and hands-free navigation
 - **Progress Tracking**: Daily calorie and macro tracking with visual charts
@@ -105,8 +106,14 @@ ai_diet_app/
 ### 3. Ingredients Screen
 - **Input Section**: Text and voice ingredient entry
 - **Quick Selection**: Common ingredients as chips
-- **Recipe Generation**: AI-powered suggestions
-- **Recipe Details**: Full cooking instructions
+- **Recipe Generation**: AI-powered suggestions with Groq + pantry fallback metadata
+- **Recipe Details**: Full cooking instructions and backup pantry matches
+
+## 🔌 Backend Integration
+
+- Copy `.env.example` → `.env` and fill `API_BASE_URL`, `GROQ_API_KEY`, `GROQ_CHAT_MODEL`, `GROQ_TTS_*` to unlock LLM features.
+- Run the backend (`npm install && npm start` inside `/backend`) so the Flutter app can call `/api/mealplan/generate` and `/api/mealplan/recipes-by-ingredients`.
+- Use the bundled onboarding flow to create a profile, then tap **Pantry assistant** to verify ingredient → recipe generation (watch for the AI vs pantry badges).
 
 ### 4. Progress Screen
 - **Daily Overview**: Calorie progress with visual indicators
@@ -146,8 +153,9 @@ dependencies:
   google_fonts: ^6.1.0          # Typography
   shared_preferences: ^2.2.2     # Local storage
   fl_chart: ^0.65.0             # Charts and graphs
-  flutter_tts: ^3.8.5          # Text-to-speech
-  speech_to_text: ^6.6.0       # Voice input
+   audioplayers: ^6.0.0         # Groq TTS playback
+   flutter_dotenv: ^5.1.0       # Runtime env vars (API keys)
+   http: ^1.5.0                 # Backend + Groq calls
 ```
 
 ## 📊 Data Models
